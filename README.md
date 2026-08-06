@@ -5,9 +5,9 @@ Thušo AI is an AI-powered accessibility platform designed to improve access to 
 ## Team
 
 - Tokelo Mashiane
-- Member 2
-- Member 3
-- Member 4
+- Mashatola Motlatso Carol 
+- Nkadimeng Ludwig Dimpe
+- Maphalle Dineo Wilson
 
 ## Challenge
 
