@@ -8,6 +8,8 @@ Thušo AI is an AI-powered accessibility platform designed to improve access to 
 - Mashatola Motlatso Carol 
 - Nkadimeng Ludwig Dimpe
 - Maphalle Dineo Wilson
+- Lufuno Nekhumbe
+- Jackie Ramalebane
 
 ## Challenge
 
