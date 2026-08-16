@@ -1,0 +1,12 @@
+{
+  "locations": [
+    {
+      "id": 1,
+      "name": "Example Service Point",
+      "wheelchairAccessible": true,
+      "audioGuidance": true,
+      "signLanguageSupport": false,
+      "accessibleEntrance": true
+    }
+  ]
+}
