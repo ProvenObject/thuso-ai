@@ -14,6 +14,12 @@ app.get("/api/status", (req, res) => {
     });
 });
 
+app.get("/api/health", (req, res) => {
+    res.json({
+        status: "ok"
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Thušo AI running at http://localhost:${PORT}`);
 });
