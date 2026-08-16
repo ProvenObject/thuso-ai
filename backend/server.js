@@ -20,6 +20,15 @@ app.get("/api/health", (req, res) => {
     });
 });
 
+app.get("/api/accessibility", (req, res) => {
+    res.json({
+        wheelchairAccessible: true,
+        audioGuidance: true,
+        signLanguageSupport: false,
+        accessibleEntrance: true
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Thušo AI running at http://localhost:${PORT}`);
 });
