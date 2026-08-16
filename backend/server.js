@@ -1,5 +1,13 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
+
+const accessibilityData = JSON.parse(
+    fs.readFileSync(
+        path.join(__dirname, "data", "accessibility.json"),
+        "utf-8"
+    )
+);
 
 const app = express();
 const PORT = 3000;
@@ -18,6 +26,10 @@ app.get("/api/health", (req, res) => {
     res.json({
         status: "ok"
     });
+});
+
+app.get("/api/accessibility", (req, res) => {
+    res.json(accessibilityData);
 });
 
 app.listen(PORT, () => {
