@@ -29,7 +29,48 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/accessibility", (req, res) => {
-    res.json(accessibilityData);
+    const {
+        wheelchairAccessible,
+        audioGuidance,
+        signLanguageSupport,
+        accessibleEntrance
+    } = req.query;
+
+    let filteredData = accessibilityData.locations;
+
+    if (wheelchairAccessible !== undefined) {
+        filteredData = filteredData.filter(
+            location =>
+                location.wheelchairAccessible ===
+                (wheelchairAccessible === "true")
+        );
+    }
+
+    if (audioGuidance !== undefined) {
+        filteredData = filteredData.filter(
+            location =>
+                location.audioGuidance ===
+                (audioGuidance === "true")
+        );
+    }
+
+    if (signLanguageSupport !== undefined) {
+        filteredData = filteredData.filter(
+            location =>
+                location.signLanguageSupport ===
+                (signLanguageSupport === "true")
+        );
+    }
+
+    if (accessibleEntrance !== undefined) {
+        filteredData = filteredData.filter(
+            location =>
+                location.accessibleEntrance ===
+                (accessibleEntrance === "true")
+        );
+    }
+
+    res.json(filteredData);
 });
 
 app.get("/api/accessibility/:id", (req, res) => {
