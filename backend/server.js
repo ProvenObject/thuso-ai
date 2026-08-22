@@ -2,6 +2,13 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 
+const servicesData = JSON.parse(
+    fs.readFileSync(
+        path.join(__dirname, "data", "services.json"),
+        "utf-8"
+    )
+);
+
 const accessibilityData = JSON.parse(
     fs.readFileSync(
         path.join(__dirname, "data", "accessibility.json"),
@@ -88,6 +95,29 @@ app.get("/api/accessibility/:id", (req, res) => {
 
     res.json(location);
 });
+
+// Get all government services
+app.get("/api/services", (req, res) => {
+    res.json(servicesData.services);
+});
+
+// Get a specific government service by ID
+app.get("/api/services/:id", (req, res) => {
+    const serviceId = Number(req.params.id);
+
+    const service = servicesData.services.find(
+        service => service.id === serviceId
+    );
+
+    if (!service) {
+        return res.status(404).json({
+            message: "Service not found"
+        });
+    }
+
+    res.json(service);
+});
+
 
 app.listen(PORT, () => {
     console.log(`Thušo AI running at http://localhost:${PORT}`);
