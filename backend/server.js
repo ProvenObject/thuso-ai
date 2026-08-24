@@ -9,6 +9,14 @@ const servicesData = JSON.parse(
     )
 );
 
+const locationsData = JSON.parse(
+    fs.readFileSync(
+        path.join(__dirname, "data", "locations.json"),
+        "utf-8"
+    )
+);
+
+
 const accessibilityData = JSON.parse(
     fs.readFileSync(
         path.join(__dirname, "data", "accessibility.json"),
@@ -18,6 +26,7 @@ const accessibilityData = JSON.parse(
 
 const app = express();
 const PORT = 3000;
+
 
 // Serve the frontend
 app.use(express.static(path.join(__dirname, "../frontend")));
@@ -118,6 +127,25 @@ app.get("/api/services/:id", (req, res) => {
     res.json(service);
 });
 
+app.get("/api/services/:serviceId/locations", (req, res) => {
+    const serviceId = Number(req.params.serviceId);
+
+    const service = servicesData.services.find(
+        service => service.id === serviceId
+    );
+
+    if (!service) {
+        return res.status(404).json({
+            message: "Service not found"
+        });
+    }
+
+    const serviceLocations = locationsData.locations.filter(
+        location => location.serviceId === serviceId
+    );
+
+    res.json(serviceLocations);
+});
 
 app.listen(PORT, () => {
     console.log(`Thušo AI running at http://localhost:${PORT}`);
