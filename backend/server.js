@@ -153,6 +153,32 @@ app.get("/api/locations", (req, res) => {
     res.json(locationsData.locations);
 });
 
+app.get("/api/locations/:id/accessibility", (req, res) => {
+    const locationId = Number(req.params.id);
+
+    const location = locationsData.locations.find(
+        location => location.id === locationId
+    );
+
+    if (!location) {
+        return res.status(404).json({
+            message: "Location not found"
+        });
+    }
+
+    const accessibilityInfo = accessibilityData.locations.find(
+        accessibility => accessibility.id === locationId
+    );
+
+    if (!accessibilityInfo) {
+        return res.status(404).json({
+            message: "Accessibility information not found"
+        });
+    }
+
+    res.json(accessibilityInfo);
+});
+
 app.get("/api/locations/:id", (req, res) => {
     const locationId = Number(req.params.id);
 
