@@ -29,12 +29,16 @@
                 <h2>How can we help you today?</h2>
 
                 <p>
-                    Find government services and explore accessibility
-                    information before your visit.
+                    Find government services, explore accessibility
+                    information, or ask Thušo for help.
                 </p>
 
                 <button id="find-service-btn" class="primary-btn">
                     Find a Service
+                </button>
+
+                <button id="ask-thuso-btn" class="secondary-btn">
+                    Ask Thušo
                 </button>
             </div>
 
@@ -95,6 +99,44 @@
             <div id="accessibility-info"></div>
 
         </section>
+
+        <!-- Ask Thušo Screen -->
+<section id="ask-screen" class="screen">
+
+    <button class="back-btn" data-back="home-screen">
+        ← Back
+    </button>
+
+    <h2>Ask Thušo</h2>
+
+    <p class="screen-description">
+        Ask a question about government services or accessibility.
+    </p>
+
+    <div id="chat-messages" class="chat-messages">
+
+        <div class="message assistant-message">
+            Hello! 👋 I'm Thušo. How can I help you today?
+        </div>
+
+    </div>
+
+    <form id="chat-form" class="chat-form">
+
+        <input
+            type="text"
+            id="chat-input"
+            placeholder="Type your question..."
+            autocomplete="off"
+        >
+
+        <button type="submit">
+            Send
+        </button>
+
+    </form>
+
+</section>
 
     </main>
 
