@@ -22,6 +22,12 @@ document
         showScreen("services-screen");
     });
 
+// Ask Thušo button
+document
+    .getElementById("ask-thuso-btn")
+    .addEventListener("click", () => {
+        showScreen("ask-screen");
+    });
 
 // Load government services
 async function loadServices() {
@@ -171,6 +177,124 @@ async function loadLocationDetails(locationId) {
     }
 }
 
+// Chat functionality
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+const chatMessages = document.getElementById("chat-messages");
+
+chatForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const message = chatInput.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+    // Create user message
+    const userMessage = document.createElement("div");
+
+    userMessage.classList.add("message", "user-message");
+
+    userMessage.textContent = message;
+
+    chatMessages.appendChild(userMessage);
+
+    // Clear input
+    chatInput.value = "";
+
+    try {
+    const response = await fetch(`${API_URL}/api/ask`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            message: message
+        })
+    });
+
+    const data = await response.json();
+
+    const assistantMessage = document.createElement("div");
+
+    assistantMessage.classList.add(
+        "message",
+        "assistant-message"
+    );
+
+    assistantMessage.textContent = data.response;
+
+    chatMessages.appendChild(assistantMessage);
+
+    if (data.locations && data.locations.length > 0) {
+
+    data.locations.forEach(location => {
+
+        const locationCard =
+            document.createElement("button");
+
+        locationCard.classList.add("chat-location-card");
+
+        if (location.accessibilityMatch) {
+            locationCard.classList.add("recommended-location");
+        }
+
+        locationCard.innerHTML = `
+            ${location.accessibilityMatch
+                ? `<span class="recommendation-label">
+                    ✓ Recommended for you
+                   </span>`
+                : ""
+            }
+
+            <h3>${location.name}</h3>
+
+            <p>${location.address}</p>
+        `;
+
+        locationCard.addEventListener("click", () => {
+            loadLocationDetails(location.id);
+        });
+
+        chatMessages.appendChild(locationCard);
+    });
+}
+
+    // Show service action if a matching service was found
+if (data.service) {
+    const serviceButton = document.createElement("button");
+
+    serviceButton.classList.add("chat-service-btn");
+
+    serviceButton.textContent =
+        `View ${data.service.name} locations →`;
+
+    serviceButton.addEventListener("click", () => {
+        loadLocations(data.service);
+    });
+
+    chatMessages.appendChild(serviceButton);
+}
+
+} catch (error) {
+    console.error(error);
+
+    const assistantMessage = document.createElement("div");
+
+    assistantMessage.classList.add(
+        "message",
+        "assistant-message"
+    );
+
+    assistantMessage.textContent =
+        "Sorry, I'm having trouble connecting right now.";
+
+    chatMessages.appendChild(assistantMessage);
+}
+    // Scroll to newest message
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
 
 // Back buttons
 document.querySelectorAll(".back-btn").forEach(button => {
