@@ -110,23 +110,7 @@ app.get("/api/services", (req, res) => {
     res.json(servicesData.services);
 });
 
-// Get a specific government service by ID
-app.get("/api/services/:id", (req, res) => {
-    const serviceId = Number(req.params.id);
-
-    const service = servicesData.services.find(
-        service => service.id === serviceId
-    );
-
-    if (!service) {
-        return res.status(404).json({
-            message: "Service not found"
-        });
-    }
-
-    res.json(service);
-});
-
+// Get all locations for a specific service
 app.get("/api/services/:serviceId/locations", (req, res) => {
     const serviceId = Number(req.params.serviceId);
 
@@ -145,6 +129,44 @@ app.get("/api/services/:serviceId/locations", (req, res) => {
     );
 
     res.json(serviceLocations);
+});
+
+// Get a specific government service by ID
+app.get("/api/services/:id", (req, res) => {
+    const serviceId = Number(req.params.id);
+
+    const service = servicesData.services.find(
+        service => service.id === serviceId
+    );
+
+    if (!service) {
+        return res.status(404).json({
+            message: "Service not found"
+        });
+    }
+
+    res.json(service);
+});
+
+// Locations endpoints
+app.get("/api/locations", (req, res) => {
+    res.json(locationsData.locations);
+});
+
+app.get("/api/locations/:id", (req, res) => {
+    const locationId = Number(req.params.id);
+
+    const location = locationsData.locations.find(
+        location => location.id === locationId
+    );
+
+    if (!location) {
+        return res.status(404).json({
+            message: "Location not found"
+        });
+    }
+
+    res.json(location);
 });
 
 app.listen(PORT, () => {
