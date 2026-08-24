@@ -5,6 +5,8 @@ let currentLocation = null;
 // Screen elements
 const screens = document.querySelectorAll(".screen");
 
+let previousScreen = null;
+
 function showScreen(screenId) {
     screens.forEach(screen => {
         screen.classList.remove("active");
@@ -106,7 +108,10 @@ async function loadLocations(service) {
             `;
 
             card.addEventListener("click", () => {
-                loadLocationDetails(location.id);
+                loadLocationDetails(
+                    location.id,
+                    "locations-screen"
+                );
             });
 
             locationsList.appendChild(card);
@@ -122,7 +127,12 @@ async function loadLocations(service) {
 
 
 // Load location details and accessibility information
-async function loadLocationDetails(locationId) {
+async function loadLocationDetails(
+    locationId,
+    fromScreen = "locations-screen"
+) {
+
+    previousScreen = fromScreen;
 
     showScreen("location-screen");
 
@@ -220,16 +230,19 @@ chatForm.addEventListener("submit", async (event) => {
 
     const data = await response.json();
 
-    const assistantMessage = document.createElement("div");
+const assistantMessage = document.createElement("div");
 
-    assistantMessage.classList.add(
-        "message",
-        "assistant-message"
-    );
+assistantMessage.classList.add(
+    "message",
+    "assistant-message"
+);
 
-    assistantMessage.textContent = data.response;
+assistantMessage.textContent = data.response;
 
-    chatMessages.appendChild(assistantMessage);
+chatMessages.appendChild(assistantMessage);
+
+
+// Show recommended locations
 
     if (data.locations && data.locations.length > 0) {
 
@@ -258,9 +271,11 @@ chatForm.addEventListener("submit", async (event) => {
         `;
 
         locationCard.addEventListener("click", () => {
-            loadLocationDetails(location.id);
+            loadLocationDetails(
+                location.id,
+                "ask-screen"
+            );
         });
-
         chatMessages.appendChild(locationCard);
     });
 }
@@ -323,6 +338,19 @@ document
 document.querySelectorAll(".back-btn").forEach(button => {
 
     button.addEventListener("click", () => {
+
+        const currentScreen = document.querySelector(
+            ".screen.active"
+        );
+
+        if (
+            currentScreen.id === "location-screen" &&
+            previousScreen
+        ) {
+            showScreen(previousScreen);
+            return;
+        }
+
         showScreen(button.dataset.back);
     });
 
