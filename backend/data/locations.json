@@ -1,0 +1,54 @@
+{
+  "locations": [
+    {
+      "id": 1,
+      "serviceId": 1,
+      "name": "Polokwane Home Affairs",
+      "address": "Polokwane, Limpopo",
+      "province": "Limpopo",
+      "city": "Polokwane",
+      "latitude": -23.9045,
+      "longitude": 29.4689
+    },
+    {
+      "id": 2,
+      "serviceId": 1,
+      "name": "Seshego Home Affairs",
+      "address": "Seshego, Limpopo",
+      "province": "Limpopo",
+      "city": "Seshego",
+      "latitude": -23.8560,
+      "longitude": 29.3910
+    },
+    {
+      "id": 3,
+      "serviceId": 2,
+      "name": "Polokwane SASSA Office",
+      "address": "Polokwane, Limpopo",
+      "province": "Limpopo",
+      "city": "Polokwane",
+      "latitude": -23.9070,
+      "longitude": 29.4520
+    },
+    {
+      "id": 4,
+      "serviceId": 3,
+      "name": "Polokwane Provincial Hospital",
+      "address": "Polokwane, Limpopo",
+      "province": "Limpopo",
+      "city": "Polokwane",
+      "latitude": -23.8970,
+      "longitude": 29.4480
+    },
+    {
+      "id": 5,
+      "serviceId": 4,
+      "name": "Polokwane Municipality",
+      "address": "Polokwane, Limpopo",
+      "province": "Limpopo",
+      "city": "Polokwane",
+      "latitude": -23.9030,
+      "longitude": 29.4620
+    }
+  ]
+}
