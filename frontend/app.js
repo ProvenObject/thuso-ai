@@ -1,5 +1,7 @@
 const API_URL = "http://localhost:3000";
 
+let currentLocation = null;
+
 // Screen elements
 const screens = document.querySelectorAll(".screen");
 
@@ -130,6 +132,8 @@ async function loadLocationDetails(locationId) {
         );
 
         const location = await locationResponse.json();
+
+        currentLocation = location;
 
         document.getElementById(
             "location-name"
@@ -295,6 +299,25 @@ if (data.service) {
     // Scroll to newest message
     chatMessages.scrollTop = chatMessages.scrollHeight;
 });
+
+// Get directions using Google Maps
+document
+    .getElementById("directions-btn")
+    .addEventListener("click", () => {
+
+        if (!currentLocation) {
+            return;
+        }
+
+        const destination = encodeURIComponent(
+            currentLocation.address
+        );
+
+        const mapsUrl =
+            `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+
+        window.open(mapsUrl, "_blank");
+    });
 
 // Back buttons
 document.querySelectorAll(".back-btn").forEach(button => {
