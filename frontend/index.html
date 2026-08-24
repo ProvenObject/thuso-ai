@@ -5,17 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Thušo AI</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <h1>Thušo AI</h1>
+    <main class="app">
 
-    <p>Accessible community mobility for everyone.</p>
+        <!-- Home Screen -->
+        <section id="home-screen" class="screen active">
 
-    <button>Find Transport</button>
-    <button>Accessibility Options</button>
-    <button>AI Assistant</button>
+            <header class="hero">
+                <div class="logo">T</div>
+
+                <div>
+                    <h1>Thušo AI</h1>
+                    <p>Helping you access government services with confidence.</p>
+                </div>
+            </header>
+
+            <div class="hero-content">
+                <h2>How can we help you today?</h2>
+
+                <p>
+                    Find government services and explore accessibility
+                    information before your visit.
+                </p>
+
+                <button id="find-service-btn" class="primary-btn">
+                    Find a Service
+                </button>
+            </div>
+
+        </section>
+
+
+        <!-- Services Screen -->
+        <section id="services-screen" class="screen">
+
+            <button class="back-btn" data-back="home-screen">
+                ← Back
+            </button>
+
+            <h2>Government Services</h2>
+
+            <p class="screen-description">
+                Choose the service you need.
+            </p>
+
+            <div id="services-list" class="card-list"></div>
+
+        </section>
+
+
+        <!-- Locations Screen -->
+        <section id="locations-screen" class="screen">
+
+            <button class="back-btn" data-back="services-screen">
+                ← Back
+            </button>
+
+            <h2 id="selected-service-name">
+                Locations
+            </h2>
+
+            <p class="screen-description">
+                Select a location near you.
+            </p>
+
+            <div id="locations-list" class="card-list"></div>
+
+        </section>
+
+
+        <!-- Location Details Screen -->
+        <section id="location-screen" class="screen">
+
+            <button class="back-btn" data-back="locations-screen">
+                ← Back
+            </button>
+
+            <h2 id="location-name"></h2>
+
+            <p id="location-address"></p>
+
+            <h3>Accessibility Information</h3>
+
+            <div id="accessibility-info"></div>
+
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
 
 </body>
 </html>
