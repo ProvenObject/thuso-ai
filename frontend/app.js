@@ -164,25 +164,53 @@ async function loadLocationDetails(
         const accessibilityInfo =
             document.getElementById("accessibility-info");
 
+        function getAccessibilityStatus(value, availableText, unavailableText) {
+    if (value === true) {
+        return availableText;
+    }
+
+    if (value === false) {
+        return unavailableText;
+    }
+
+    return "Not verified";
+}
+
         accessibilityInfo.innerHTML = `
             <div class="accessibility-item">
                 <strong>Wheelchair Accessible</strong>
-                ${accessibility.wheelchairAccessible ? "Yes" : "No"}
+                ${getAccessibilityStatus(
+                    accessibility.wheelchairAccessible,
+                    "Yes",
+                    "No"
+                )}
             </div>
 
             <div class="accessibility-item">
                 <strong>Accessible Entrance</strong>
-                ${accessibility.accessibleEntrance ? "Yes" : "No"}
+                ${getAccessibilityStatus(
+                    accessibility.accessibleEntrance,
+                    "Yes",
+                    "No"
+                )}
             </div>
 
             <div class="accessibility-item">
                 <strong>Audio Guidance</strong>
-                ${accessibility.audioGuidance ? "Available" : "Not available"}
+                ${getAccessibilityStatus(
+                    accessibility.audioGuidance,
+                    "Available",
+                    "Not available"
+                )}
             </div>
 
             <div class="accessibility-item">
                 <strong>Sign Language Support</strong>
-                ${accessibility.signLanguageSupport ? "Available" : "Not available"}
+                ${getAccessibilityStatus(
+                    accessibility.signLanguageSupport,
+                    "Available",
+                    "Not available"
+                )}
             </div>
         `;
 
