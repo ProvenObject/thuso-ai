@@ -31,15 +31,16 @@ const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
 
-// Temporary in-memory conversation state
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Temporary conversation memory
 const conversationState = {
     service: null,
     accessibilityNeed: null,
     city: null
 };
-
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -213,7 +214,9 @@ app.get("/api/locations/:id", (req, res) => {
 
 // Ask Thušo endpoint
 app.post("/api/ask", async (req, res) => {
-    const message = req.body.message?.toLowerCase();
+
+    const rawMessage = req.body.message?.trim() || "";
+    const message = rawMessage.toLowerCase();
 
     if (!message) {
         return res.status(400).json({
@@ -221,70 +224,87 @@ app.post("/api/ask", async (req, res) => {
         });
     }
 
+    /*
+    ============================================
+    START FRESH FOR THIS MESSAGE
+    ============================================
+    */
+
+    let service = null;
+    let accessibilityNeed = null;
+    let city = null;
+
+
+    /*
+    ============================================
+    GEMINI INTENT DETECTION
+    Optional - app still works without Gemini
+    ============================================
+    */
+
     let aiIntent = null;
 
     try {
+
         const result = await ai.models.generateContent({
             model: "gemini-3.6-flash",
 
             contents: `
-            You are the language understanding system for Thušo AI.
+You are the language understanding system for Thušo AI.
 
-            Thušo AI helps people find government services and accessible service locations in Limpopo, South Africa.
+Thušo AI helps people find government services and accessible
+service locations in Limpopo, South Africa.
 
-            Analyse the user's message and identify:
+Analyse ONLY the user's CURRENT message.
 
-            1. Which government service they need.
-            2. Any accessibility need they mention.
-            3. The city or town they mention.
+Identify:
 
-            Available services:
-            - Home Affairs
-            - SASSA
-            - Department of Health
-            - Municipal Services
-            - Education
+1. Which service they need.
+2. Whether they mention an accessibility need.
+3. Whether they mention a city or town.
 
-            Available accessibility needs:
-            - wheelchairAccessible
-            - audioGuidance
-            - signLanguageSupport
-            - accessibleEntrance
+Available services:
+- Home Affairs
+- SASSA
+- Department of Health
+- Municipal Services
+- Education
 
-            Known cities and towns:
-            - Polokwane
-            - Seshego
-            - Lebowakgomo
-            - Mokopane
-            - Tzaneen
-            - Giyani
-            - Thohoyandou
-            - Louis Trichardt
-            - Musina
-            - Burgersfort
-            - Jane Furse
+Available accessibility needs:
+- wheelchairAccessible
+- audioGuidance
+- signLanguageSupport
+- accessibleEntrance
 
-            Important:
-            - Understand spelling mistakes and informal phrasing.
-            - For example, "Lebowakgmo" should be interpreted as "Lebowakgomo".
-            - "I need a doctor" means "Department of Health".
-            - "I use a wheelchair" means "wheelchairAccessible".
-            - If the message only provides a city, return that city while setting the other fields to null.
+Known cities:
+- Polokwane
+- Seshego
+- Lebowakgomo
+- Mokopane
+- Tzaneen
+- Giyani
+- Thohoyandou
+- Louis Trichardt
+- Musina
+- Burgersfort
+- Jane Furse
 
-            Return ONLY valid JSON in exactly this format:
+Return ONLY valid JSON.
 
-            {
-            "service": "Home Affairs or SASSA or Department of Health or Municipal Services or Education or null",
-            "accessibilityNeed": "wheelchairAccessible or audioGuidance or signLanguageSupport or accessibleEntrance or null",
-            "city": "Polokwane or Seshego or Lebowakgomo or Mokopane or Tzaneen or Giyani or Thohoyandou or Louis Trichardt or Musina or Burgersfort or Jane Furse or null"
-            }
+Use this exact format:
 
-            User message:
-            "${message}"
+{
+    "service": "Home Affairs or SASSA or Department of Health or Municipal Services or Education or null",
+    "accessibilityNeed": "wheelchairAccessible or audioGuidance or signLanguageSupport or accessibleEntrance or null",
+    "city": "city name or null"
+}
+
+User message:
+"${rawMessage}"
             `
         });
 
-        const text = result.text;
+        const text = result.text || "";
 
         const cleanedText = text
             .replace(/```json/g, "")
@@ -292,63 +312,38 @@ app.post("/api/ask", async (req, res) => {
             .trim();
 
         aiIntent = JSON.parse(cleanedText);
+
         console.log("AI Intent:", aiIntent);
 
     } catch (error) {
-        console.error("Gemini understanding error:", error);
+
+        console.error(
+            "Gemini understanding error:",
+            error.message
+        );
+
+        // App continues using offline logic
     }
 
-    let response =
-        "I'm not sure which service can help with that yet. Try describing what you need help with.";
 
-    let service = null;
-    let accessibilityNeed = null;
-    let city = null;
+    /*
+    ============================================
+    SERVICE DETECTION
+    CURRENT MESSAGE HAS PRIORITY
+    ============================================
+    */
 
-    // Service from Gemini
+    // Gemini result first
     if (aiIntent?.service) {
-        const foundService = servicesData.services.find(
-            service => service.name === aiIntent.service
-        );
 
-        if (foundService) {
-            conversationContext.service = foundService;
-        }
+        service =
+            servicesData.services.find(
+                s => s.name === aiIntent.service
+            ) || null;
     }
 
-    if (aiIntent?.accessibilityNeed) {
-        conversationContext.accessibilityNeed =
-            aiIntent.accessibilityNeed;
-    }
 
-    if (aiIntent?.city) {
-        conversationContext.city =
-            aiIntent.city;
-    }
-
-    // Keep the previous service for follow-up questions
-    if (!service && conversationState.service) {
-        service = servicesData.services.find(
-            service => service.name === conversationState.service
-        );
-    }
-
-    // Accessibility need from Gemini
-    if (aiIntent?.accessibilityNeed) {
-        accessibilityNeed = aiIntent.accessibilityNeed;
-    } else if (conversationState.accessibilityNeed) {
-        accessibilityNeed =
-            conversationState.accessibilityNeed;
-    }
-
-    // City from Gemini
-    if (aiIntent?.city) {
-        city = aiIntent.city;
-    } else if (conversationState.city) {
-        city = conversationState.city;
-    }
-
-    // Home Affairs fallback
+    // Home Affairs
     if (!service && (
         message.includes("id") ||
         message.includes("identity") ||
@@ -356,132 +351,223 @@ app.post("/api/ask", async (req, res) => {
         message.includes("birth certificate") ||
         message.includes("marriage certificate")
     )) {
-        service = servicesData.services.find(
-            service => service.name === "Home Affairs"
-        );
+
+        service =
+            servicesData.services.find(
+                s => s.name === "Home Affairs"
+            );
     }
 
-    // SASSA fallback
+
+    // SASSA
     if (!service && (
         message.includes("grant") ||
         message.includes("sassa") ||
         message.includes("social grant")
     )) {
-        service = servicesData.services.find(
-            service => service.name === "SASSA"
-        );
+
+        service =
+            servicesData.services.find(
+                s => s.name === "SASSA"
+            );
     }
 
-    // Department of Health fallback
+
+    // Department of Health
     if (!service && (
         message.includes("clinic") ||
         message.includes("hospital") ||
         message.includes("health") ||
         message.includes("doctor") ||
-        message.includes("medicine")
+        message.includes("medicine") ||
+        message.includes("sick") ||
+        message.includes("ill") ||
+        message.includes("medical")
     )) {
-        service = servicesData.services.find(
-            service => service.name === "Department of Health"
-        );
+
+        service =
+            servicesData.services.find(
+                s => s.name === "Department of Health"
+            );
     }
 
-    // Municipal Services fallback
+
+    // Municipal Services
     if (!service && (
         message.includes("municipality") ||
         message.includes("municipal") ||
         message.includes("rates") ||
-        message.includes("certificate")
+        message.includes("water") ||
+        message.includes("electricity") ||
+        message.includes("refuse")
     )) {
-        service = servicesData.services.find(
-            service => service.name === "Municipal Services"
-        );
+
+        service =
+            servicesData.services.find(
+                s => s.name === "Municipal Services"
+            );
     }
 
-    // Education fallback
+
+    // Education
     if (!service && (
         message.includes("education") ||
         message.includes("school") ||
         message.includes("bursary") ||
-        message.includes("university")
+        message.includes("university") ||
+        message.includes("college")
     )) {
-        service = servicesData.services.find(
-            service => service.name === "Education"
-        );
+
+        service =
+            servicesData.services.find(
+                s => s.name === "Education"
+            );
     }
-    // Accessibility needs
-    if (!accessibilityNeed && (
+
+
+    /*
+    ============================================
+    ACCESSIBILITY DETECTION
+    ============================================
+    */
+
+    if (aiIntent?.accessibilityNeed) {
+
+        accessibilityNeed =
+            aiIntent.accessibilityNeed;
+
+    } else if (
         message.includes("blind") ||
         message.includes("visual impairment") ||
         message.includes("visually impaired")
-    )) {
-        accessibilityNeed = "audioGuidance";
-    }
+    ) {
 
-    if (!accessibilityNeed && (
+        accessibilityNeed = "audioGuidance";
+
+    } else if (
         message.includes("deaf") ||
         message.includes("hearing impaired") ||
-        message.includes("sign language")
-    )) {
-        accessibilityNeed = "signLanguageSupport";
-    }
+        message.includes("sign language") ||
+        message.includes("cannot hear") ||
+        message.includes("can't hear")
+    ) {
 
-    if (!accessibilityNeed && (
+        accessibilityNeed =
+            "signLanguageSupport";
+
+    } else if (
         message.includes("wheelchair") ||
         message.includes("wheel chair") ||
         message.includes("mobility impairment") ||
         message.includes("cannot walk")
-    )) {
-        accessibilityNeed = "wheelchairAccessible";
-    }
+    ) {
 
-    if (!accessibilityNeed && (
+        accessibilityNeed =
+            "wheelchairAccessible";
+
+    } else if (
         message.includes("accessible entrance") ||
         message.includes("step-free") ||
         message.includes("no stairs")
-    )) {
-        accessibilityNeed = "accessibleEntrance";
+    ) {
+
+        accessibilityNeed =
+            "accessibleEntrance";
     }
 
-    // City fallback detection
-    const knownCities = [
-        "Polokwane",
-        "Seshego",
-        "Lebowakgomo",
-        "Mokopane",
-        "Tzaneen",
-        "Giyani",
-        "Thohoyandou",
-        "Louis Trichardt",
-        "Musina",
-        "Burgersfort",
-        "Jane Furse"
-    ];
 
-    const cityAliases = {
-        "lebowakgmo": "Lebowakgomo",
-        "lebowakgomo": "Lebowakgomo",
-        "polokwane": "Polokwane",
-        "seshego": "Seshego",
-        "mokopane": "Mokopane",
-        "tzaneen": "Tzaneen",
-        "giyani": "Giyani",
-        "thohoyandou": "Thohoyandou",
-        "louis trichardt": "Louis Trichardt",
-        "musina": "Musina",
-        "burgersfort": "Burgersfort",
-        "jane furse": "Jane Furse"
-    };
+    /*
+    ============================================
+    CITY DETECTION
+    ============================================
+    */
 
-    for (const [alias, cityName] of Object.entries(cityAliases)) {
-        if (message.includes(alias)) {
-            city = cityName;
-            break;
+    if (aiIntent?.city) {
+
+        city = aiIntent.city;
+
+    } else {
+
+        const cityAliases = {
+
+            "lebowakgmo": "Lebowakgomo",
+            "lebowakgomo": "Lebowakgomo",
+
+            "polokwane": "Polokwane",
+            "seshego": "Seshego",
+            "mokopane": "Mokopane",
+            "tzaneen": "Tzaneen",
+            "giyani": "Giyani",
+            "thohoyandou": "Thohoyandou",
+            "louis trichardt": "Louis Trichardt",
+            "musina": "Musina",
+            "burgersfort": "Burgersfort",
+            "jane furse": "Jane Furse"
+        };
+
+        for (
+            const [alias, cityName]
+            of Object.entries(cityAliases)
+        ) {
+
+            if (message.includes(alias)) {
+
+                city = cityName;
+                break;
+            }
         }
     }
 
-    // Save useful context for the next message
+
+    /*
+    ============================================
+    NOW USE PREVIOUS CONTEXT
+    ONLY IF CURRENT MESSAGE DID NOT SPECIFY IT
+    ============================================
+    */
+
+    if (
+        !service &&
+        conversationState.service
+    ) {
+
+        service =
+            servicesData.services.find(
+                s => s.name ===
+                    conversationState.service
+            ) || null;
+    }
+
+
+    if (
+        !accessibilityNeed &&
+        conversationState.accessibilityNeed
+    ) {
+
+        accessibilityNeed =
+            conversationState.accessibilityNeed;
+    }
+
+
+    if (
+        !city &&
+        conversationState.city
+    ) {
+
+        city =
+            conversationState.city;
+    }
+
+
+    /*
+    ============================================
+    UPDATE CONVERSATION STATE
+    ============================================
+    */
+
     if (service) {
-        conversationState.service = service.name;
+        conversationState.service =
+            service.name;
     }
 
     if (accessibilityNeed) {
@@ -490,153 +576,214 @@ app.post("/api/ask", async (req, res) => {
     }
 
     if (city) {
-        conversationState.city = city;
+        conversationState.city =
+            city;
     }
+
+
+    console.log("Conversation state:", {
+        service:
+            conversationState.service,
+
+        accessibilityNeed:
+            conversationState.accessibilityNeed,
+
+        city:
+            conversationState.city
+    });
+
+
+    /*
+    ============================================
+    FIND LOCATIONS
+    ============================================
+    */
 
     let locations = [];
 
-if (service) {
+    if (service) {
 
-    locations = locationsData.locations
-        .filter(location => location.serviceId === service.id)
-        .map(location => {
+        locations =
+            locationsData.locations
+                .filter(
+                    location =>
+                        location.serviceId ===
+                        service.id
+                )
+                .map(location => {
 
-            const accessibilityInfo =
-                accessibilityData.locations.find(
-                    accessibility =>
-                        accessibility.id === location.id
+                    const accessibility =
+                        accessibilityData.locations.find(
+                            item =>
+                                item.id ===
+                                location.id
+                        );
+
+                    const accessibilityMatch =
+                        Boolean(
+                            accessibilityNeed &&
+                            accessibility &&
+                            accessibility[
+                                accessibilityNeed
+                            ] === true
+                        );
+
+                    return {
+                        ...location,
+                        accessibilityMatch
+                    };
+                });
+
+
+        /*
+        ============================================
+        SCORE LOCATIONS
+        ============================================
+        */
+
+        locations.forEach(location => {
+
+            let score = 0;
+
+            // City is highest priority
+            if (
+                city &&
+                location.city &&
+                location.city
+                    .toLowerCase() ===
+                city.toLowerCase()
+            ) {
+
+                score += 10;
+            }
+
+
+            // Accessibility preference
+            if (
+                accessibilityNeed &&
+                location.accessibilityMatch
+            ) {
+
+                score += 5;
+            }
+
+
+            location.relevanceScore = score;
+        });
+
+
+        locations.sort(
+            (a, b) =>
+                b.relevanceScore -
+                a.relevanceScore
+        );
+    }
+
+
+    /*
+    ============================================
+    BUILD RESPONSE
+    OFFLINE VERSION
+    ============================================
+    */
+
+    let response;
+
+    if (!service) {
+
+        response =
+            "I'm not sure which government service can help with that. Try telling me what you need help with, for example an ID, grant, doctor, municipality, school or bursary.";
+
+    } else {
+
+        response =
+            `It sounds like you may need help from ${service.name}. ${service.description}`;
+
+        if (city) {
+
+            const cityLocations =
+                locations.filter(
+                    location =>
+                        location.city &&
+                        location.city
+                            .toLowerCase() ===
+                        city.toLowerCase()
                 );
 
-            const accessibilityMatch =
-                accessibilityNeed &&
-                accessibilityInfo &&
-                accessibilityInfo[accessibilityNeed] === true;
+            if (cityLocations.length > 0) {
 
-            return {
-                ...location,
-                accessibilityMatch: Boolean(accessibilityMatch)
+                response +=
+                    ` I found ${cityLocations.length} location${cityLocations.length === 1 ? "" : "s"} in ${city}.`;
+
+            } else {
+
+                response +=
+                    ` I couldn't find a location specifically in ${city}, so I've shown the closest available options first.`;
+            }
+        }
+
+
+        if (accessibilityNeed) {
+
+            const accessibilityLabels = {
+
+                wheelchairAccessible:
+                    "wheelchair access",
+
+                audioGuidance:
+                    "audio guidance",
+
+                signLanguageSupport:
+                    "sign language support",
+
+                accessibleEntrance:
+                    "an accessible entrance"
             };
-        });
 
-    // Rank locations based on city and accessibility needs
-    locations.forEach(location => {
-        let score = 0;
 
-        // Prioritize locations in the user's city
+            const matchingLocations =
+                locations.filter(
+                    location =>
+                        location.accessibilityMatch
+                );
+
+
+            if (
+                matchingLocations.length > 0
+            ) {
+
+                response +=
+                    ` I prioritized ${matchingLocations.length} location${matchingLocations.length === 1 ? "" : "s"} with ${accessibilityLabels[accessibilityNeed]}.`;
+
+            } else {
+
+                response +=
+                    ` I couldn't verify ${accessibilityLabels[accessibilityNeed]} for the locations in the current data.`;
+            }
+        }
+
+
         if (
-            city &&
-            location.city.toLowerCase() === city.toLowerCase()
+            locations.length > 0 &&
+            !city &&
+            !accessibilityNeed
         ) {
-            score += 10;
-        }
 
-        // Prioritize verified accessibility matches
-        if (
-            accessibilityNeed &&
-            location.accessibilityMatch === true
-        ) {
-            score += 5;
-        }
-
-        location.relevanceScore = score;
-    });
-
-    locations.sort((a, b) => {
-        return b.relevanceScore - a.relevanceScore;
-    });
-
-    response =
-        `It sounds like you may need help from ${service.name}. ${service.description}`;
-
-    if (accessibilityNeed) {
-
-        const accessibilityLabels = {
-            wheelchairAccessible: "wheelchair access",
-            audioGuidance: "audio guidance",
-            signLanguageSupport: "sign language support",
-            accessibleEntrance: "an accessible entrance"
-        };
-
-        const matchingLocations = locations.filter(
-            location => location.accessibilityMatch
-        );
-
-        response +=
-            ` I prioritized locations with ${accessibilityLabels[accessibilityNeed]}.`;
-
-        if (matchingLocations.length > 0) {
             response +=
-                ` I found ${matchingLocations.length} recommended location${matchingLocations.length === 1 ? "" : "s"} that match your accessibility needs.`;
-        } else {
-            response +=
-                " I couldn't find a location in the current data that matches that accessibility need, but you can still view the available locations.";
+                ` I found ${locations.length} location${locations.length === 1 ? "" : "s"} for this service.`;
         }
-
-    } else if (locations.length > 0) {
-
-        response +=
-            ` I found ${locations.length} location${locations.length === 1 ? "" : "s"} for this service.`;
-    }
-}
-
-    try {
-        const locationSummary = locations.length > 0
-            ? locations
-                .map(location => `${location.name} in ${location.city}`)
-                .join(", ")
-            : "No matching locations were found";
-
-        const result = await ai.models.generateContent({
-            model: "gemini-3.6-flash",
-
-            contents: `
-    You are Thušo AI, a helpful and concise assistant that helps people access government services in Limpopo, South Africa.
-
-    Respond naturally to the user's message.
-
-    User message:
-    "${message}"
-
-    The backend identified this service:
-    ${service ? service.name : "No specific service identified"}
-
-    Accessibility need:
-    ${accessibilityNeed || "None identified"}
-
-    User's current city:
-    ${city || "Unknown"}
-
-    Number of matching locations:
-    ${locations.length}
-
-    Matching locations:
-    ${locationSummary}
-
-    Important rules:
-    - Do not invent government offices, addresses, accessibility features, or services.
-    - Only discuss the service and locations provided above.
-    - Do not list every location because the interface will display them separately.
-    - Keep your answer concise, helpful, and conversational.
-    - If no service was identified, ask the user to explain what help they need.
-    - Do not use Markdown formatting, asterisks, headings, or bullet points.
-    - Return plain conversational text only.
-            `
-        });
-
-        if (result.text) {
-            response = result.text.trim();
-        }
-
-    } catch (error) {
-        console.error("Gemini response error:", error);
     }
 
-    locations.forEach(location => {
-        delete location.relevanceScore;
-    });
+
+    /*
+    ============================================
+    RETURN DATA
+    ============================================
+    */
 
     res.json({
-        response: response,
+
+        response,
 
         service: service
             ? {
@@ -645,8 +792,9 @@ if (service) {
             }
             : null,
 
-        locations: locations
+        locations
     });
+
 });
 
 app.post("/api/test-gemini", async (req, res) => {

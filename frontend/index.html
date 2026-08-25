@@ -117,6 +117,15 @@
         Ask a question about government services or accessibility.
     </p>
 
+    <label class="voice-toggle">
+        <input
+            type="checkbox"
+            id="voice-output-toggle"
+            checked
+        >
+        🔊 Read responses aloud
+    </label>
+
     <div id="chat-messages" class="chat-messages">
 
         <div class="message assistant-message">
@@ -130,9 +139,18 @@
         <input
             type="text"
             id="chat-input"
-            placeholder="Type your question..."
+            placeholder="Type or speak your question..."
             autocomplete="off"
         >
+
+        <button
+            type="button"
+            id="voice-input-btn"
+            aria-label="Speak your question"
+            title="Speak your question"
+        >
+            🎤
+        </button>
 
         <button type="submit">
             Send

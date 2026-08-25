@@ -224,6 +224,117 @@ const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const chatMessages = document.getElementById("chat-messages");
 
+const voiceOutputToggle =
+    document.getElementById("voice-output-toggle");
+
+let voiceOutputEnabled = true;
+
+voiceOutputToggle.addEventListener("change", () => {
+    voiceOutputEnabled =
+        voiceOutputToggle.checked;
+});
+
+const voiceInputBtn =
+    document.getElementById("voice-input-btn");
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+let recognition = null;
+
+if (SpeechRecognition) {
+
+    recognition = new SpeechRecognition();
+
+    recognition.continuous = false;
+
+    recognition.interimResults = false;
+
+    recognition.lang = "en-ZA";
+
+    voiceInputBtn.addEventListener("click", () => {
+
+        recognition.start();
+
+    });
+
+    recognition.addEventListener("start", () => {
+
+        voiceInputBtn.textContent = "Listening...";
+
+        voiceInputBtn.disabled = true;
+
+    });
+
+    recognition.addEventListener("result", (event) => {
+
+        const transcript =
+            event.results[0][0].transcript;
+
+        chatInput.value = transcript;
+
+        // Automatically send the spoken message
+        chatForm.requestSubmit();
+
+    });
+    
+    recognition.addEventListener("end", () => {
+
+        voiceInputBtn.textContent = "🎤";
+
+        voiceInputBtn.disabled = false;
+
+    });
+
+    recognition.addEventListener("error", (event) => {
+
+        console.error(
+            "Speech recognition error:",
+            event.error
+        );
+
+        voiceInputBtn.textContent = "🎤";
+
+        voiceInputBtn.disabled = false;
+
+    });
+
+} else {
+
+    voiceInputBtn.style.display = "none";
+
+    console.warn(
+        "Speech recognition is not supported in this browser."
+    );
+}
+
+function speakText(text) {
+
+    if (!voiceOutputEnabled) {
+        return;
+    }
+
+    if (!("speechSynthesis" in window)) {
+        console.warn(
+            "Text-to-speech is not supported in this browser."
+        );
+        return;
+    }
+
+    // Stop any previous speech
+        window.speechSynthesis.cancel();
+
+        const speech =
+            new SpeechSynthesisUtterance(text);
+
+        speech.lang = "en-ZA";
+        speech.rate = 1;
+        speech.pitch = 1;
+
+        window.speechSynthesis.speak(speech);
+    }
+
 chatForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -269,6 +380,7 @@ assistantMessage.textContent = data.response;
 
 chatMessages.appendChild(assistantMessage);
 
+speakText(data.response);
 
 // Show recommended locations
 
