@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000";
+const API_URL = "";
 
 let currentLocation = null;
 
@@ -246,7 +246,7 @@ chatForm.addEventListener("submit", async (event) => {
     chatInput.value = "";
 
     try {
-    const response = await fetch(`${API_URL}/api/ask`, {
+    const response = await fetch("/api/ask", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
