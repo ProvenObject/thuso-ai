@@ -1,3 +1,6 @@
+require("dotenv").config();
+const { GoogleGenAI } = require("@google/genai");
+
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -23,6 +26,11 @@ const accessibilityData = JSON.parse(
         "utf-8"
     )
 );
+
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+});
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -378,6 +386,26 @@ if (service) {
 
         locations: locations
     });
+});
+
+app.post("/api/test-gemini", async (req, res) => {
+    try {
+        const result = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: "Say hello and briefly explain that you are Thušo AI, an assistant helping people access government services."
+        });
+
+        res.json({
+            response: result.text
+        });
+
+    } catch (error) {
+        console.error("Gemini error:", error);
+
+        res.status(500).json({
+            error: "Failed to communicate with Gemini"
+        });
+    }
 });
 
 app.listen(PORT, () => {
