@@ -1,3 +1,6 @@
+require("dotenv").config();
+const { GoogleGenAI } = require("@google/genai");
+
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -23,6 +26,11 @@ const accessibilityData = JSON.parse(
         "utf-8"
     )
 );
+
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+});
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -198,7 +206,7 @@ app.get("/api/locations/:id", (req, res) => {
 });
 
 // Ask Thušo endpoint
-app.post("/api/ask", (req, res) => {
+app.post("/api/ask", async (req, res) => {
     const message = req.body.message?.toLowerCase();
 
     if (!message) {
@@ -207,96 +215,152 @@ app.post("/api/ask", (req, res) => {
         });
     }
 
+    let aiIntent = null;
+
+    try {
+        const result = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+
+            contents: `
+    You are the language understanding system for Thušo AI.
+
+    Thušo AI helps people find government services and accessible service locations in Limpopo, South Africa.
+
+    Analyse the user's message and identify:
+
+    1. Which service they need.
+    2. Whether they mention an accessibility need.
+
+    Available services:
+    - Home Affairs
+    - SASSA
+    - Department of Health
+    - Municipal Services
+    - Education
+
+    Available accessibility needs:
+    - wheelchairAccessible
+    - audioGuidance
+    - signLanguageSupport
+    - accessibleEntrance
+
+    Return ONLY valid JSON in this exact format:
+
+    {
+    "service": "Home Affairs or SASSA or Department of Health or Municipal Services or Education or null",
+    "accessibilityNeed": "wheelchairAccessible or audioGuidance or signLanguageSupport or accessibleEntrance or null"
+    }
+
+    User message:
+    "${message}"
+            `
+        });
+
+        const text = result.text;
+
+        const cleanedText = text
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
+
+        aiIntent = JSON.parse(cleanedText);
+
+    } catch (error) {
+        console.error("Gemini understanding error:", error);
+    }
+
     let response =
         "I'm not sure which service can help with that yet. Try describing what you need help with.";
 
     let service = null;
     let accessibilityNeed = null;
 
-    // Home Affairs
-    if (
+    if (aiIntent?.service) {
+    service = servicesData.services.find(
+        service => service.name === aiIntent.service
+        );
+    }
+
+    if (aiIntent?.accessibilityNeed) {
+        accessibilityNeed = aiIntent.accessibilityNeed;
+    }
+
+    // Home Affairs fallback
+    if (!service && (
         message.includes("id") ||
         message.includes("identity") ||
         message.includes("passport") ||
         message.includes("birth certificate") ||
         message.includes("marriage certificate")
-    ) {
+    )) {
         service = servicesData.services.find(
             service => service.name === "Home Affairs"
         );
     }
 
-    // SASSA
-    else if (
+    // SASSA fallback
+    if (!service && (
         message.includes("grant") ||
         message.includes("sassa") ||
         message.includes("social grant")
-    ) {
+    )) {
         service = servicesData.services.find(
             service => service.name === "SASSA"
         );
     }
 
-    // Department of Health
-    else if (
+    // Department of Health fallback
+    if (!service && (
         message.includes("clinic") ||
         message.includes("hospital") ||
         message.includes("health") ||
         message.includes("doctor") ||
         message.includes("medicine")
-    ) {
+    )) {
         service = servicesData.services.find(
             service => service.name === "Department of Health"
         );
     }
 
-    // Municipal Services
-    else if (
+    // Municipal Services fallback
+    if (!service && (
         message.includes("municipality") ||
         message.includes("municipal") ||
         message.includes("rates") ||
         message.includes("certificate")
-    ) {
+    )) {
         service = servicesData.services.find(
             service => service.name === "Municipal Services"
         );
     }
 
-    // Education
-    else if (
+    // Education fallback
+    if (!service && (
         message.includes("education") ||
         message.includes("school") ||
         message.includes("bursary") ||
         message.includes("university")
-    ) {
+    )) {
         service = servicesData.services.find(
             service => service.name === "Education"
         );
     }
     // Accessibility needs
-    if (
-    message.includes("wheelchair") ||
-    message.includes("wheel chair") ||
-    message.includes("ramp")
-) {
-    accessibilityNeed = "wheelchairAccessible";
-}
+    if (!accessibilityNeed && (
+        message.includes("blind") ||
+        message.includes("visual impairment") ||
+        message.includes("visually impaired")
+    )) {
+        accessibilityNeed = "audioGuidance";
+    }
 
-if (
-    message.includes("blind") ||
-    message.includes("visual impairment") ||
-    message.includes("visually impaired")
-) {
-    accessibilityNeed = "audioGuidance";
-}
-
-if (
-    message.includes("deaf") ||
-    message.includes("hearing impaired") ||
-    message.includes("sign language")
-) {
-    accessibilityNeed = "signLanguageSupport";
-}
+    if (!accessibilityNeed && (
+        message.includes("deaf") ||
+        message.includes("hearing impaired") ||
+        message.includes("sign language")
+    )) {
+        accessibilityNeed = "signLanguageSupport";
+    }
 
     let locations = [];
 
@@ -341,7 +405,8 @@ if (service) {
         const accessibilityLabels = {
             wheelchairAccessible: "wheelchair access",
             audioGuidance: "audio guidance",
-            signLanguageSupport: "sign language support"
+            signLanguageSupport: "sign language support",
+            accessibleEntrance: "an accessible entrance"
         };
 
         const matchingLocations = locations.filter(
@@ -366,6 +431,55 @@ if (service) {
     }
 }
 
+    try {
+        const locationSummary = locations.length > 0
+            ? locations
+                .map(location => `${location.name} in ${location.city}`)
+                .join(", ")
+            : "No matching locations were found";
+
+        const result = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+
+            contents: `
+    You are Thušo AI, a helpful and concise assistant that helps people access government services in Limpopo, South Africa.
+
+    Respond naturally to the user's message.
+
+    User message:
+    "${message}"
+
+    The backend identified this service:
+    ${service ? service.name : "No specific service identified"}
+
+    Accessibility need:
+    ${accessibilityNeed || "None identified"}
+
+    Number of matching locations:
+    ${locations.length}
+
+    Matching locations:
+    ${locationSummary}
+
+    Important rules:
+    - Do not invent government offices, addresses, accessibility features, or services.
+    - Only discuss the service and locations provided above.
+    - Do not list every location because the interface will display them separately.
+    - Keep your answer concise, helpful, and conversational.
+    - If no service was identified, ask the user to explain what help they need.
+    - Do not use Markdown formatting, asterisks, headings, or bullet points.
+    - Return plain conversational text only.
+            `
+        });
+
+        if (result.text) {
+            response = result.text.trim();
+        }
+
+    } catch (error) {
+        console.error("Gemini response error:", error);
+    }
+
     res.json({
         response: response,
 
@@ -378,6 +492,26 @@ if (service) {
 
         locations: locations
     });
+});
+
+app.post("/api/test-gemini", async (req, res) => {
+    try {
+        const result = await ai.models.generateContent({
+            model: "gemini-3.6-flash",
+            contents: "Say hello and briefly explain that you are Thušo AI, an assistant helping people access government services."
+        });
+
+        res.json({
+            response: result.text
+        });
+
+    } catch (error) {
+        console.error("Gemini error:", error);
+
+        res.status(500).json({
+            error: "Failed to communicate with Gemini"
+        });
+    }
 });
 
 app.listen(PORT, () => {
