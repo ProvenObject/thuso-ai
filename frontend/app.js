@@ -1,132 +1,605 @@
+/* =========================================================
+   THUŠO AI — APP LOGIC
+   ========================================================= */
+
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+/*
+    Leave this as an empty string when your frontend and backend
+    are served from the same origin.
+
+    Example:
+    const API_URL = "http://localhost:3000";
+*/
+
 const API_URL = "";
 
+
+/* =========================================================
+   APP STATE
+========================================================= */
+
+let previousScreen = "home-screen";
 let currentLocation = null;
+let currentService = null;
 
-// Screen elements
-const screens = document.querySelectorAll(".screen");
+let voiceOutputEnabled = true;
+let recognition = null;
+let isListening = false;
+let isAssistantSpeaking = false;
 
-let previousScreen = null;
 
-function showScreen(screenId) {
-    screens.forEach(screen => {
-        screen.classList.remove("active");
-    });
+/* =========================================================
+   DOM HELPERS
+========================================================= */
 
-    document
-        .getElementById(screenId)
-        .classList.add("active");
+const $ = (selector) => document.querySelector(selector);
+
+const getById = (id) => document.getElementById(id);
+
+
+function createIcon(name) {
+    return `<i data-lucide="${name}"></i>`;
 }
 
 
-// Find Service button
-document
-    .getElementById("find-service-btn")
-    .addEventListener("click", () => {
-        loadServices();
-        showScreen("services-screen");
-    });
-
-// Ask Thušo button
-document
-    .getElementById("ask-thuso-btn")
-    .addEventListener("click", () => {
-        showScreen("ask-screen");
-    });
-
-// Load government services
-async function loadServices() {
-    const servicesList = document.getElementById("services-list");
-
-    servicesList.innerHTML = "<p>Loading services...</p>";
-
-    try {
-        const response = await fetch(
-            `${API_URL}/api/services`
-        );
-
-        const services = await response.json();
-
-        servicesList.innerHTML = "";
-
-        services.forEach(service => {
-            const card = document.createElement("button");
-
-            card.classList.add("card");
-
-            card.innerHTML = `
-                <h3>${service.name}</h3>
-                <p>${service.description}</p>
-            `;
-
-            card.addEventListener("click", () => {
-                loadLocations(service);
-            });
-
-            servicesList.appendChild(card);
-        });
-
-    } catch (error) {
-        console.error(error);
-
-        servicesList.innerHTML =
-            "<p>Unable to load services. Please try again.</p>";
+function refreshIcons() {
+    if (window.lucide) {
+        lucide.createIcons();
     }
 }
 
 
-// Load locations for a selected service
-async function loadLocations(service) {
-    const locationsList =
-        document.getElementById("locations-list");
+function scrollChatToBottom() {
+    const chatMessages = getById("chat-messages");
 
-    document.getElementById(
-        "selected-service-name"
-    ).textContent = service.name;
+    if (!chatMessages) return;
 
-    locationsList.innerHTML =
-        "<p>Loading locations...</p>";
+    requestAnimationFrame(() => {
+        chatMessages.scrollTop =
+            chatMessages.scrollHeight;
+    });
+}
 
-    showScreen("locations-screen");
+
+function escapeHtml(value = "") {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+async function fetchJson(url, options = {}) {
+
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+        throw new Error(
+            `Request failed: ${response.status}`
+        );
+    }
+
+    return response.json();
+}
+
+
+/* =========================================================
+   SCREEN NAVIGATION
+========================================================= */
+
+function showScreen(screenId) {
+
+    const screens =
+        document.querySelectorAll(".screen");
+
+    const targetScreen =
+        getById(screenId);
+
+    if (!targetScreen) {
+        console.warn(
+            `Screen not found: ${screenId}`
+        );
+        return;
+    }
+
+    screens.forEach(screen => {
+        screen.classList.remove("active-screen");
+    });
+
+    targetScreen.classList.add("active-screen");
+
+
+    /* -----------------------------------------
+       Bottom navigation active state
+    ----------------------------------------- */
+
+    document
+        .querySelectorAll(".nav-item")
+        .forEach(item => {
+
+            item.classList.remove("active");
+
+            if (
+                item.dataset.screen === screenId
+            ) {
+                item.classList.add("active");
+            }
+
+        });
+
+
+    /* -----------------------------------------
+       Hide bottom navigation on detail/camera
+    ----------------------------------------- */
+
+    const bottomNav =
+        getById("bottom-nav");
+
+    if (bottomNav) {
+
+        const hideNavScreens = [
+            "location-details-screen",
+            "camera-screen"
+        ];
+
+        bottomNav.style.display =
+            hideNavScreens.includes(screenId)
+                ? "none"
+                : "flex";
+    }
+
+
+    /* -----------------------------------------
+       Screen-specific loading
+    ----------------------------------------- */
+
+    if (
+        screenId === "services-screen" &&
+        !getById("services-list").dataset.loaded
+    ) {
+        loadServices();
+    }
+
+    if (
+        screenId === "locations-screen" &&
+        !getById("locations-list").dataset.loaded
+    ) {
+        loadAllLocations();
+    }
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+/*
+    Expose this globally because index.html
+    uses onclick="showScreen(...)"
+*/
+
+window.showScreen = showScreen;
+
+
+/* =========================================================
+   SERVICES
+========================================================= */
+
+async function loadServices() {
+
+    const servicesList =
+        getById("services-list");
+
+    if (!servicesList) return;
+
+    servicesList.innerHTML = `
+        <div class="loading-state">
+            Loading services...
+        </div>
+    `;
 
     try {
-        const response = await fetch(
-            `${API_URL}/api/services/${service.id}/locations`
-        );
 
-        const locations = await response.json();
+        const services =
+            await fetchJson(
+                `${API_URL}/api/services`
+            );
 
-        locationsList.innerHTML = "";
+        servicesList.innerHTML = "";
 
-        locations.forEach(location => {
-            const card = document.createElement("button");
-
-            card.classList.add("card");
-
-            card.innerHTML = `
-                <h3>${location.name}</h3>
-                <p>${location.address}</p>
+        if (
+            !Array.isArray(services) ||
+            services.length === 0
+        ) {
+            servicesList.innerHTML = `
+                <div class="empty-state">
+                    <h3>No services found</h3>
+                    <p>
+                        Please try again later.
+                    </p>
+                </div>
             `;
 
-            card.addEventListener("click", () => {
+            return;
+        }
+
+
+        services.forEach(service => {
+
+            const card =
+                document.createElement("button");
+
+            card.type = "button";
+
+            card.className =
+                "service-card";
+
+            card.dataset.serviceId =
+                service.id;
+
+            card.dataset.search =
+                `${service.name || ""} ${
+                    service.description || ""
+                }`.toLowerCase();
+
+            card.innerHTML = `
+                <div class="service-icon">
+                    ${createIcon("landmark")}
+                </div>
+
+                <div class="service-info">
+                    <h3>
+                        ${escapeHtml(
+                            service.name
+                        )}
+                    </h3>
+
+                    <p>
+                        ${escapeHtml(
+                            service.description ||
+                            "Find locations and services"
+                        )}
+                    </p>
+                </div>
+
+                ${createIcon("chevron-right")}
+            `;
+
+            card.addEventListener(
+                "click",
+                () => {
+                    loadLocations(
+                        service
+                    );
+                }
+            );
+
+            servicesList.appendChild(
+                card
+            );
+
+        });
+
+
+        servicesList.dataset.loaded =
+            "true";
+
+        refreshIcons();
+
+    } catch (error) {
+
+        console.error(
+            "Unable to load services:",
+            error
+        );
+
+        servicesList.innerHTML = `
+            <div class="empty-state">
+                <h3>
+                    Unable to load services
+                </h3>
+
+                <p>
+                    Please check your connection
+                    and try again.
+                </p>
+            </div>
+        `;
+    }
+}
+
+
+/* =========================================================
+   LOAD LOCATIONS FOR A SERVICE
+========================================================= */
+
+async function loadLocations(service) {
+
+    if (!service || !service.id) {
+        console.warn(
+            "Invalid service supplied."
+        );
+
+        return;
+    }
+
+    currentService = service;
+
+    previousScreen = "services-screen";
+
+    const locationsList =
+        getById("locations-list");
+
+    if (!locationsList) return;
+
+
+    showScreen(
+        "locations-screen"
+    );
+
+    locationsList.dataset.loaded =
+        "true";
+
+    locationsList.innerHTML = `
+        <div class="loading-state">
+            Loading locations...
+        </div>
+    `;
+
+    try {
+
+        const locations =
+            await fetchJson(
+                `${API_URL}/api/services/${service.id}/locations`
+            );
+
+        renderLocations(
+            locations,
+            service.name
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Unable to load locations:",
+            error
+        );
+
+        locationsList.innerHTML = `
+            <div class="empty-state">
+                <h3>
+                    Unable to load locations
+                </h3>
+
+                <p>
+                    Please try again later.
+                </p>
+            </div>
+        `;
+    }
+}
+
+
+/* =========================================================
+   LOAD ALL LOCATIONS
+========================================================= */
+
+async function loadAllLocations() {
+
+    const locationsList =
+        getById("locations-list");
+
+    if (!locationsList) return;
+
+    locationsList.innerHTML = `
+        <div class="loading-state">
+            Loading locations...
+        </div>
+    `;
+
+    try {
+
+        const locations =
+            await fetchJson(
+                `${API_URL}/api/locations`
+            );
+
+        renderLocations(locations);
+
+        locationsList.dataset.loaded =
+            "true";
+
+    } catch (error) {
+
+        /*
+            Some backends may not have a general
+            /api/locations endpoint.
+
+            We handle that gracefully instead of
+            crashing the application.
+        */
+
+        console.warn(
+            "Unable to load all locations:",
+            error
+        );
+
+        locationsList.innerHTML = `
+            <div class="empty-state">
+                <h3>
+                    Find a service first
+                </h3>
+
+                <p>
+                    Select a government service to
+                    see its available locations.
+                </p>
+
+                <button
+                    class="primary-btn"
+                    type="button"
+                    id="find-services-btn"
+                >
+                    Find Services
+                </button>
+            </div>
+        `;
+
+        const button =
+            getById("find-services-btn");
+
+        if (button) {
+            button.addEventListener(
+                "click",
+                () => {
+                    showScreen(
+                        "services-screen"
+                    );
+                }
+            );
+        }
+    }
+}
+
+
+/* =========================================================
+   RENDER LOCATIONS
+========================================================= */
+
+function renderLocations(
+    locations,
+    serviceName = ""
+) {
+
+    const locationsList =
+        getById("locations-list");
+
+    if (!locationsList) return;
+
+    locationsList.innerHTML = "";
+
+
+    if (
+        serviceName &&
+        serviceName.trim()
+    ) {
+
+        const heading =
+            document.createElement("div");
+
+        heading.className =
+            "locations-service-heading";
+
+        heading.innerHTML = `
+            <p>
+                Showing locations for
+            </p>
+
+            <h3>
+                ${escapeHtml(serviceName)}
+            </h3>
+        `;
+
+        locationsList.appendChild(
+            heading
+        );
+    }
+
+
+    if (
+        !Array.isArray(locations) ||
+        locations.length === 0
+    ) {
+
+        locationsList.innerHTML += `
+            <div class="empty-state">
+                <h3>
+                    No locations found
+                </h3>
+
+                <p>
+                    Try another service.
+                </p>
+            </div>
+        `;
+
+        return;
+    }
+
+
+    locations.forEach(location => {
+
+        const card =
+            document.createElement("button");
+
+        card.type = "button";
+
+        card.className =
+            "location-card";
+
+        card.dataset.search =
+            `${location.name || ""} ${
+                location.address || ""
+            }`.toLowerCase();
+
+        card.innerHTML = `
+            <div class="location-icon">
+                ${createIcon("map-pin")}
+            </div>
+
+            <div class="location-info">
+                <h3>
+                    ${escapeHtml(
+                        location.name
+                    )}
+                </h3>
+
+                <p>
+                    ${escapeHtml(
+                        location.address ||
+                        "Address unavailable"
+                    )}
+                </p>
+            </div>
+
+            ${createIcon("chevron-right")}
+        `;
+
+        card.addEventListener(
+            "click",
+            () => {
+
                 loadLocationDetails(
                     location.id,
                     "locations-screen"
                 );
-            });
 
-            locationsList.appendChild(card);
-        });
+            }
+        );
 
-    } catch (error) {
-        console.error(error);
+        locationsList.appendChild(
+            card
+        );
 
-        locationsList.innerHTML =
-            "<p>Unable to load locations.</p>";
-    }
+    });
+
+
+    refreshIcons();
 }
 
 
-// Load location details and accessibility information
+/* =========================================================
+   LOCATION DETAILS
+========================================================= */
+
 async function loadLocationDetails(
     locationId,
     fromScreen = "locations-screen"
@@ -134,180 +607,860 @@ async function loadLocationDetails(
 
     previousScreen = fromScreen;
 
-    showScreen("location-screen");
+    const details =
+        getById("location-details");
+
+    if (!details) return;
+
+
+    showScreen(
+        "location-details-screen"
+    );
+
+
+    details.innerHTML = `
+        <div class="loading-state">
+            Loading location details...
+        </div>
+    `;
+
 
     try {
-        const locationResponse = await fetch(
-            `${API_URL}/api/locations/${locationId}`
-        );
 
-        const location = await locationResponse.json();
+        const location =
+            await fetchJson(
+                `${API_URL}/api/locations/${locationId}`
+            );
 
         currentLocation = location;
 
-        document.getElementById(
-            "location-name"
-        ).textContent = location.name;
 
-        document.getElementById(
-            "location-address"
-        ).textContent = location.address;
+        let accessibility = {};
+
+        try {
+
+            accessibility =
+                await fetchJson(
+                    `${API_URL}/api/locations/${locationId}/accessibility`
+                );
+
+        } catch (accessibilityError) {
+
+            console.warn(
+                "Accessibility information unavailable:",
+                accessibilityError
+            );
+        }
 
 
-        const accessibilityResponse = await fetch(
-            `${API_URL}/api/locations/${locationId}/accessibility`
+        renderLocationDetails(
+            location,
+            accessibility
         );
 
-        const accessibility =
-            await accessibilityResponse.json();
+    } catch (error) {
 
-        const accessibilityInfo =
-            document.getElementById("accessibility-info");
+        console.error(
+            "Unable to load location:",
+            error
+        );
 
-        function getAccessibilityStatus(value, availableText, unavailableText) {
-    if (value === true) {
-        return availableText;
-    }
+        details.innerHTML = `
+            <div class="empty-state">
+                <h3>
+                    Unable to load this location
+                </h3>
 
-    if (value === false) {
-        return unavailableText;
-    }
+                <p>
+                    Please try again.
+                </p>
 
-    return "Not verified";
-}
-
-        accessibilityInfo.innerHTML = `
-            <div class="accessibility-item">
-                <strong>Wheelchair Accessible</strong>
-                ${getAccessibilityStatus(
-                    accessibility.wheelchairAccessible,
-                    "Yes",
-                    "No"
-                )}
-            </div>
-
-            <div class="accessibility-item">
-                <strong>Accessible Entrance</strong>
-                ${getAccessibilityStatus(
-                    accessibility.accessibleEntrance,
-                    "Yes",
-                    "No"
-                )}
-            </div>
-
-            <div class="accessibility-item">
-                <strong>Audio Guidance</strong>
-                ${getAccessibilityStatus(
-                    accessibility.audioGuidance,
-                    "Available",
-                    "Not available"
-                )}
-            </div>
-
-            <div class="accessibility-item">
-                <strong>Sign Language Support</strong>
-                ${getAccessibilityStatus(
-                    accessibility.signLanguageSupport,
-                    "Available",
-                    "Not available"
-                )}
+                <button
+                    class="primary-btn"
+                    type="button"
+                    id="retry-location-btn"
+                >
+                    Try Again
+                </button>
             </div>
         `;
 
-    } catch (error) {
-        console.error(error);
+        const retryButton =
+            getById(
+                "retry-location-btn"
+            );
+
+        if (retryButton) {
+
+            retryButton.addEventListener(
+                "click",
+                () => {
+
+                    loadLocationDetails(
+                        locationId,
+                        fromScreen
+                    );
+
+                }
+            );
+        }
     }
 }
 
-// Chat functionality
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-const chatMessages = document.getElementById("chat-messages");
 
-const voiceOutputToggle =
-    document.getElementById("voice-output-toggle");
+function getAccessibilityStatus(value) {
 
-let voiceOutputEnabled = true;
+    if (value === true) {
+        return {
+            label: "Available",
+            state: "available",
+            icon: "circle-check"
+        };
+    }
 
-voiceOutputToggle.addEventListener("change", () => {
-    voiceOutputEnabled =
-        voiceOutputToggle.checked;
-});
+    if (value === false) {
+        return {
+            label: "Not available",
+            state: "unavailable",
+            icon: "circle-x"
+        };
+    }
 
-const voiceInputBtn =
-    document.getElementById("voice-input-btn");
+    return {
+        label: "Not verified",
+        state: "unknown",
+        icon: "circle-help"
+    };
+}
 
-const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
 
-let recognition = null;
+function renderAccessibilityFeature(
+    title,
+    value,
+    icon
+) {
 
-if (SpeechRecognition) {
+    const status =
+        getAccessibilityStatus(value);
 
-    recognition = new SpeechRecognition();
+    return `
+        <div class="accessibility-feature">
+            ${createIcon(icon)}
 
-    recognition.continuous = false;
+            <h4>
+                ${escapeHtml(title)}
+            </h4>
 
-    recognition.interimResults = false;
+            <p class="feature-status ${status.state}">
+                ${status.label}
+            </p>
+        </div>
+    `;
+}
 
-    recognition.lang = "en-ZA";
 
-    voiceInputBtn.addEventListener("click", () => {
+function renderLocationDetails(
+    location,
+    accessibility
+) {
 
-        recognition.start();
+    const details =
+        getById("location-details");
 
-    });
+    if (!details) return;
 
-    recognition.addEventListener("start", () => {
 
-        voiceInputBtn.textContent = "Listening...";
+    const image =
+        location.image ||
+        location.imageUrl ||
+        "";
 
-        voiceInputBtn.disabled = true;
 
-    });
+    details.innerHTML = `
 
-    recognition.addEventListener("result", (event) => {
+        ${
+            image
+                ? `
+                    <img
+                        class="location-image"
+                        src="${escapeHtml(image)}"
+                        alt="${escapeHtml(location.name)}"
+                    >
+                `
+                : `
+                    <div class="location-image-placeholder">
+                        ${createIcon("building-2")}
+                    </div>
+                `
+        }
 
-        const transcript =
-            event.results[0][0].transcript;
 
-        chatInput.value = transcript;
+        <div class="details-content">
 
-        // Automatically send the spoken message
-        chatForm.requestSubmit();
+            <div class="location-title-row">
 
-    });
-    
-    recognition.addEventListener("end", () => {
+                <div>
 
-        voiceInputBtn.textContent = "🎤";
+                    <h1>
+                        ${escapeHtml(
+                            location.name
+                        )}
+                    </h1>
 
-        voiceInputBtn.disabled = false;
+                    <p class="location-address">
+                        ${createIcon("map-pin")}
+                        ${escapeHtml(
+                            location.address ||
+                            "Address unavailable"
+                        )}
+                    </p>
 
-    });
+                </div>
 
-    recognition.addEventListener("error", (event) => {
+            </div>
 
-        console.error(
-            "Speech recognition error:",
-            event.error
+
+            ${
+                location.description
+                    ? `
+                        <p class="location-description">
+                            ${escapeHtml(
+                                location.description
+                            )}
+                        </p>
+                    `
+                    : ""
+            }
+
+
+            <section class="accessibility-section">
+
+                <div class="section-heading">
+
+                    <h2>
+                        Accessibility
+                    </h2>
+
+                    <p>
+                        Information about available features
+                    </p>
+
+                </div>
+
+
+                <div class="accessibility-features">
+
+                    ${renderAccessibilityFeature(
+                        "Wheelchair Access",
+                        accessibility.wheelchairAccessible,
+                        "accessibility"
+                    )}
+
+                    ${renderAccessibilityFeature(
+                        "Accessible Entrance",
+                        accessibility.accessibleEntrance,
+                        "door-open"
+                    )}
+
+                    ${renderAccessibilityFeature(
+                        "Audio Guidance",
+                        accessibility.audioGuidance,
+                        "volume-2"
+                    )}
+
+                    ${renderAccessibilityFeature(
+                        "Sign Language Support",
+                        accessibility.signLanguageSupport,
+                        "hand"
+                    )}
+
+                </div>
+
+            </section>
+
+
+            <button
+                id="directions-btn"
+                class="primary-btn directions-btn"
+                type="button"
+            >
+
+                ${createIcon("navigation")}
+
+                Get Directions
+
+            </button>
+
+        </div>
+    `;
+
+
+    const directionsButton =
+        getById("directions-btn");
+
+    if (directionsButton) {
+
+        directionsButton.addEventListener(
+            "click",
+            openDirections
+        );
+    }
+
+
+    refreshIcons();
+}
+
+
+/* =========================================================
+   DIRECTIONS
+========================================================= */
+
+function openDirections() {
+
+    if (
+        !currentLocation ||
+        !currentLocation.address
+    ) {
+        return;
+    }
+
+    const destination =
+        encodeURIComponent(
+            currentLocation.address
         );
 
-        voiceInputBtn.textContent = "🎤";
+    const mapsUrl =
+        `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 
-        voiceInputBtn.disabled = false;
-
-    });
-
-} else {
-
-    voiceInputBtn.style.display = "none";
-
-    console.warn(
-        "Speech recognition is not supported in this browser."
+    window.open(
+        mapsUrl,
+        "_blank",
+        "noopener,noreferrer"
     );
 }
+
+
+/* =========================================================
+   CHAT
+========================================================= */
+
+function addChatMessage(
+    text,
+    type = "assistant"
+) {
+
+    const chatMessages =
+        getById("chat-messages");
+
+    if (!chatMessages) return;
+
+    const message =
+        document.createElement("div");
+
+    message.className =
+        `message ${type}-message`;
+
+    message.textContent = text;
+
+    chatMessages.appendChild(message);
+
+    scrollChatToBottom();
+
+    return message;
+}
+
+
+function addTypingIndicator() {
+
+    const chatMessages =
+        getById("chat-messages");
+
+    if (!chatMessages) return null;
+
+    const typing =
+        document.createElement("div");
+
+    typing.className =
+        "message assistant-message typing-message";
+
+    typing.id = "typing-indicator";
+
+    typing.innerHTML = `
+        <span></span>
+        <span></span>
+        <span></span>
+    `;
+
+    chatMessages.appendChild(
+        typing
+    );
+
+    scrollChatToBottom();
+
+    return typing;
+}
+
+
+function removeTypingIndicator() {
+
+    const typing =
+        getById("typing-indicator");
+
+    if (typing) {
+        typing.remove();
+    }
+}
+
+
+async function sendChatMessage(message) {
+
+    if (!message) return;
+
+
+    addChatMessage(
+        message,
+        "user"
+    );
+
+
+    const typing =
+        addTypingIndicator();
+
+
+    try {
+
+        const data =
+            await fetchJson(
+                `${API_URL}/api/ask`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            message
+                        })
+                }
+            );
+
+
+        typing?.remove();
+
+
+        const responseText =
+            data.response ||
+            data.message ||
+            "Sorry, I could not find an answer.";
+
+
+        addChatMessage(
+            responseText,
+            "assistant"
+        );
+
+
+        if (
+            data.locations &&
+            Array.isArray(
+                data.locations
+            )
+        ) {
+
+            data.locations.forEach(
+                location => {
+
+                    addChatLocation(
+                        location
+                    );
+
+                }
+            );
+        }
+
+
+        if (
+            data.service &&
+            data.service.id
+        ) {
+
+            addChatServiceAction(
+                data.service
+            );
+        }
+
+
+        speakText(
+            responseText
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Chat request failed:",
+            error
+        );
+
+        typing?.remove();
+
+        addChatMessage(
+            "Sorry, I'm having trouble connecting right now.",
+            "assistant"
+        );
+
+    } finally {
+
+        removeTypingIndicator();
+
+        scrollChatToBottom();
+    }
+}
+
+
+function addChatLocation(location) {
+
+    const chatMessages =
+        getById("chat-messages");
+
+    if (!chatMessages) return;
+
+    const locationCard =
+        document.createElement("button");
+
+    locationCard.type = "button";
+
+    locationCard.className =
+        "chat-location-card";
+
+    if (
+        location.accessibilityMatch
+    ) {
+        locationCard.classList.add(
+            "recommended-location"
+        );
+    }
+
+
+    locationCard.innerHTML = `
+
+        ${
+            location.accessibilityMatch
+                ? `
+                    <span class="recommendation-label">
+                        ✓ Recommended for you
+                    </span>
+                `
+                : ""
+        }
+
+        <h3>
+            ${escapeHtml(location.name)}
+        </h3>
+
+        <p>
+            ${escapeHtml(
+                location.address ||
+                "Address unavailable"
+            )}
+        </p>
+    `;
+
+
+    locationCard.addEventListener(
+        "click",
+        () => {
+
+            loadLocationDetails(
+                location.id,
+                "ask-screen"
+            );
+
+        }
+    );
+
+
+    chatMessages.appendChild(
+        locationCard
+    );
+
+    scrollChatToBottom();
+}
+
+
+function addChatServiceAction(
+    service
+) {
+
+    const chatMessages =
+        getById("chat-messages");
+
+    if (!chatMessages) return;
+
+    const button =
+        document.createElement("button");
+
+    button.type = "button";
+
+    button.className =
+        "chat-service-btn";
+
+    button.textContent =
+        `View ${service.name} locations →`;
+
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            loadLocations(
+                service
+            );
+
+        }
+    );
+
+
+    chatMessages.appendChild(
+        button
+    );
+
+    scrollChatToBottom();
+}
+
+
+/* =========================================================
+   SPEECH RECOGNITION
+========================================================= */
+
+function initialiseSpeechRecognition() {
+
+    const voiceButton =
+        getById("voice-btn");
+
+    if (!voiceButton) return;
+
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+
+    if (!SpeechRecognition) {
+
+        voiceButton.style.display =
+            "none";
+
+        console.warn(
+            "Speech recognition is not supported in this browser."
+        );
+
+        return;
+    }
+
+
+    recognition =
+        new SpeechRecognition();
+
+
+    recognition.continuous =
+        false;
+
+    recognition.interimResults =
+        false;
+
+    recognition.lang =
+        "en-ZA";
+
+
+    recognition.addEventListener(
+        "start",
+        () => {
+
+            isListening = true;
+
+            voiceButton.disabled =
+                true;
+
+            voiceButton.classList.add(
+                "recording"
+            );
+
+            refreshIcons();
+
+        }
+    );
+
+
+    /*
+        IMPORTANT FIX:
+
+        The old version attempted to access
+        event.results inside the "start" event.
+
+        There is no transcript available there.
+
+        Speech results belong here.
+    */
+
+    recognition.addEventListener(
+        "result",
+        event => {
+
+            const transcript =
+                event.results[
+                    event.resultIndex
+                ][0].transcript;
+
+
+            const normalised =
+                transcript
+                    .toLowerCase()
+                    .trim();
+
+
+            const stopCommands = [
+                "stop",
+                "stop listening",
+                "exit conversation",
+                "end conversation",
+                "goodbye",
+                "good bye"
+            ];
+
+
+            if (
+                stopCommands.some(
+                    command =>
+                        normalised.includes(
+                            command
+                        )
+                )
+            ) {
+
+                recognition.stop();
+
+                addChatMessage(
+                    "Voice input stopped.",
+                    "assistant"
+                );
+
+                return;
+            }
+
+
+            const chatInput =
+                getById("chat-input");
+
+
+            if (chatInput) {
+
+                chatInput.value =
+                    transcript;
+
+                const form =
+                    getById("chat-form");
+
+                form?.requestSubmit();
+            }
+
+        }
+    );
+
+
+    recognition.addEventListener(
+        "end",
+        () => {
+
+            isListening = false;
+
+            voiceButton.disabled =
+                false;
+
+            voiceButton.classList.remove(
+                "recording"
+            );
+
+        }
+    );
+
+
+    recognition.addEventListener(
+        "error",
+        event => {
+
+            isListening = false;
+
+            voiceButton.disabled =
+                false;
+
+            voiceButton.classList.remove(
+                "recording"
+            );
+
+
+            /*
+                "no-speech" is normal and doesn't
+                need a scary error for the user.
+            */
+
+            if (
+                event.error !== "no-speech" &&
+                event.error !== "aborted"
+            ) {
+
+                console.error(
+                    "Speech recognition error:",
+                    event.error
+                );
+            }
+
+        }
+    );
+
+
+    voiceButton.addEventListener(
+        "click",
+        () => {
+
+            if (!recognition) return;
+
+
+            if (isListening) {
+
+                recognition.stop();
+
+                return;
+            }
+
+
+            try {
+
+                recognition.start();
+
+            } catch (error) {
+
+                /*
+                    Prevent InvalidStateError
+                    if recognition is already running.
+                */
+
+                console.warn(
+                    "Unable to start recognition:",
+                    error
+                );
+            }
+
+        }
+    );
+}
+
+
+/* =========================================================
+   TEXT TO SPEECH
+========================================================= */
 
 function speakText(text) {
 
@@ -315,183 +1468,462 @@ function speakText(text) {
         return;
     }
 
-    if (!("speechSynthesis" in window)) {
+    if (
+        !(
+            "speechSynthesis" in window
+        )
+    ) {
+
         console.warn(
-            "Text-to-speech is not supported in this browser."
+            "Text-to-speech is not supported."
         );
+
         return;
     }
 
-    // Stop any previous speech
-        window.speechSynthesis.cancel();
 
-        const speech =
-            new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.cancel();
 
-        speech.lang = "en-ZA";
-        speech.rate = 1;
-        speech.pitch = 1;
 
-        window.speechSynthesis.speak(speech);
-    }
+    const speech =
+        new SpeechSynthesisUtterance(
+            text
+        );
 
-chatForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
 
-    const message = chatInput.value.trim();
+    speech.lang =
+        "en-ZA";
 
-    if (!message) {
-        return;
-    }
+    speech.rate =
+        1;
 
-    // Create user message
-    const userMessage = document.createElement("div");
+    speech.pitch =
+        1;
 
-    userMessage.classList.add("message", "user-message");
 
-    userMessage.textContent = message;
+    speech.addEventListener(
+        "start",
+        () => {
 
-    chatMessages.appendChild(userMessage);
+            isAssistantSpeaking =
+                true;
 
-    // Clear input
-    chatInput.value = "";
-
-    try {
-    const response = await fetch("/api/ask", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            message: message
-        })
-    });
-
-    const data = await response.json();
-
-const assistantMessage = document.createElement("div");
-
-assistantMessage.classList.add(
-    "message",
-    "assistant-message"
-);
-
-assistantMessage.textContent = data.response;
-
-chatMessages.appendChild(assistantMessage);
-
-speakText(data.response);
-
-// Show recommended locations
-
-    if (data.locations && data.locations.length > 0) {
-
-    data.locations.forEach(location => {
-
-        const locationCard =
-            document.createElement("button");
-
-        locationCard.classList.add("chat-location-card");
-
-        if (location.accessibilityMatch) {
-            locationCard.classList.add("recommended-location");
         }
-
-        locationCard.innerHTML = `
-            ${location.accessibilityMatch
-                ? `<span class="recommendation-label">
-                    ✓ Recommended for you
-                   </span>`
-                : ""
-            }
-
-            <h3>${location.name}</h3>
-
-            <p>${location.address}</p>
-        `;
-
-        locationCard.addEventListener("click", () => {
-            loadLocationDetails(
-                location.id,
-                "ask-screen"
-            );
-        });
-        chatMessages.appendChild(locationCard);
-    });
-}
-
-    // Show service action if a matching service was found
-if (data.service) {
-    const serviceButton = document.createElement("button");
-
-    serviceButton.classList.add("chat-service-btn");
-
-    serviceButton.textContent =
-        `View ${data.service.name} locations →`;
-
-    serviceButton.addEventListener("click", () => {
-        loadLocations(data.service);
-    });
-
-    chatMessages.appendChild(serviceButton);
-}
-
-} catch (error) {
-    console.error(error);
-
-    const assistantMessage = document.createElement("div");
-
-    assistantMessage.classList.add(
-        "message",
-        "assistant-message"
     );
 
-    assistantMessage.textContent =
-        "Sorry, I'm having trouble connecting right now.";
 
-    chatMessages.appendChild(assistantMessage);
+    speech.addEventListener(
+        "end",
+        () => {
+
+            isAssistantSpeaking =
+                false;
+
+        }
+    );
+
+
+    speech.addEventListener(
+        "error",
+        () => {
+
+            isAssistantSpeaking =
+                false;
+
+        }
+    );
+
+
+    window.speechSynthesis.speak(
+        speech
+    );
 }
-    // Scroll to newest message
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-});
 
-// Get directions using Google Maps
-document
-    .getElementById("directions-btn")
-    .addEventListener("click", () => {
 
-        if (!currentLocation) {
-            return;
+/* =========================================================
+   SEARCH
+========================================================= */
+
+function initialiseSearch() {
+
+    const serviceSearch =
+        getById("service-search");
+
+    const locationSearch =
+        getById("location-search");
+
+
+    if (serviceSearch) {
+
+        serviceSearch.addEventListener(
+            "input",
+            event => {
+
+                const query =
+                    event.target.value
+                        .toLowerCase()
+                        .trim();
+
+
+                document
+                    .querySelectorAll(
+                        "#services-list .service-card"
+                    )
+                    .forEach(card => {
+
+                        const matches =
+                            card.dataset.search
+                                .includes(query);
+
+                        card.style.display =
+                            matches
+                                ? ""
+                                : "none";
+
+                    });
+
+            }
+        );
+    }
+
+
+    if (locationSearch) {
+
+        locationSearch.addEventListener(
+            "input",
+            event => {
+
+                const query =
+                    event.target.value
+                        .toLowerCase()
+                        .trim();
+
+
+                document
+                    .querySelectorAll(
+                        "#locations-list .location-card"
+                    )
+                    .forEach(card => {
+
+                        const matches =
+                            card.dataset.search
+                                .includes(query);
+
+                        card.style.display =
+                            matches
+                                ? ""
+                                : "none";
+
+                    });
+
+            }
+        );
+    }
+}
+
+
+/* =========================================================
+   FILTER CHIPS
+========================================================= */
+
+function initialiseFilterChips() {
+
+    document
+        .querySelectorAll(
+            ".filter-chip"
+        )
+        .forEach(chip => {
+
+            chip.addEventListener(
+                "click",
+                () => {
+
+                    const container =
+                        chip.parentElement;
+
+
+                    container
+                        ?.querySelectorAll(
+                            ".filter-chip"
+                        )
+                        .forEach(item => {
+
+                            item.classList.remove(
+                                "active"
+                            );
+
+                        });
+
+
+                    chip.classList.add(
+                        "active"
+                    );
+
+                }
+            );
+
+        });
+}
+
+
+/* =========================================================
+   PREFERENCE CONTROLS
+========================================================= */
+
+function initialisePreferences() {
+
+    /*
+        Preference chips
+    */
+
+    document
+        .querySelectorAll(
+            ".preference-chip"
+        )
+        .forEach(chip => {
+
+            chip.addEventListener(
+                "click",
+                () => {
+
+                    chip.classList.toggle(
+                        "selected"
+                    );
+
+                }
+            );
+
+        });
+
+
+    /*
+        Custom toggle buttons
+    */
+
+    document
+        .querySelectorAll(
+            ".toggle"
+        )
+        .forEach(toggle => {
+
+            toggle.addEventListener(
+                "click",
+                () => {
+
+                    toggle.classList.toggle(
+                        "active"
+                    );
+
+
+                    /*
+                        First communication toggle
+                        controls voice output.
+                    */
+
+                    const settingText =
+                        toggle
+                            .closest(
+                                ".setting-row"
+                            )
+                            ?.innerText
+                            ?.toLowerCase();
+
+
+                    if (
+                        settingText?.includes(
+                            "voice responses"
+                        )
+                    ) {
+
+                        voiceOutputEnabled =
+                            toggle.classList.contains(
+                                "active"
+                            );
+                    }
+
+                }
+            );
+
+        });
+
+
+    /*
+        Text size
+    */
+
+    const textSize =
+        getById("text-size");
+
+
+    if (textSize) {
+
+        textSize.addEventListener(
+            "input",
+            event => {
+
+                document.documentElement.style.fontSize =
+                    `${event.target.value}px`;
+
+            }
+        );
+    }
+}
+
+
+/* =========================================================
+   CHAT SUGGESTION BUTTONS
+========================================================= */
+
+function initialiseChatSuggestions() {
+
+    document
+        .querySelectorAll(
+            ".suggestion-chip"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    const chatInput =
+                        getById(
+                            "chat-input"
+                        );
+
+                    if (!chatInput) return;
+
+                    chatInput.value =
+                        button.textContent
+                            .trim();
+
+                    getById(
+                        "chat-form"
+                    )?.requestSubmit();
+
+                }
+            );
+
+        });
+}
+
+
+/* =========================================================
+   CHAT FORM
+========================================================= */
+
+function initialiseChat() {
+
+    const chatForm =
+        getById("chat-form");
+
+    const chatInput =
+        getById("chat-input");
+
+
+    if (
+        !chatForm ||
+        !chatInput
+    ) {
+        return;
+    }
+
+
+    chatForm.addEventListener(
+        "submit",
+        event => {
+
+            event.preventDefault();
+
+
+            const message =
+                chatInput.value.trim();
+
+
+            if (!message) {
+                return;
+            }
+
+
+            chatInput.value = "";
+
+
+            sendChatMessage(
+                message
+            );
+
         }
+    );
+}
 
-        const destination = encodeURIComponent(
-            currentLocation.address
+
+/* =========================================================
+   LOCATION DETAILS BACK BUTTON
+========================================================= */
+
+function initialiseLocationBackButton() {
+
+    const detailsScreen =
+        getById(
+            "location-details-screen"
         );
 
-        const mapsUrl =
-            `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    if (!detailsScreen) return;
 
-        window.open(mapsUrl, "_blank");
-    });
 
-// Back buttons
-document.querySelectorAll(".back-btn").forEach(button => {
-
-    button.addEventListener("click", () => {
-
-        const currentScreen = document.querySelector(
-            ".screen.active"
+    const backButton =
+        detailsScreen.querySelector(
+            ".back-btn"
         );
 
-        if (
-            currentScreen.id === "location-screen" &&
-            previousScreen
-        ) {
-            showScreen(previousScreen);
-            return;
+
+    if (!backButton) return;
+
+
+    /*
+        Override the inline onclick behaviour
+        if necessary.
+    */
+
+    backButton.addEventListener(
+        "click",
+        event => {
+
+            event.preventDefault();
+
+            showScreen(
+                previousScreen ||
+                "locations-screen"
+            );
+
         }
+    );
+}
 
-        showScreen(button.dataset.back);
-    });
 
-});
+/* =========================================================
+   APP INITIALISATION
+========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        initialiseChat();
+
+        initialiseSpeechRecognition();
+
+        initialiseSearch();
+
+        initialiseFilterChips();
+
+        initialisePreferences();
+
+        initialiseChatSuggestions();
+
+        initialiseLocationBackButton();
+
+        refreshIcons();
+
+    }
+);

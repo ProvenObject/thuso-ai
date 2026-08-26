@@ -2,167 +2,1252 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta name="theme-color" content="#0f5c4d">
 
     <title>Thušo AI</title>
 
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Main stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <main class="app">
+<div class="app-shell">
 
-        <!-- Home Screen -->
-        <section id="home-screen" class="screen active">
+    <!-- =========================================
+         HOME SCREEN
+    ========================================== -->
 
-            <header class="hero">
-                <div class="logo">T</div>
+    <main
+        id="home-screen"
+        class="screen active-screen"
+    >
 
-                <div>
-                    <h1>Thušo AI</h1>
-                    <p>Helping you access government services with confidence.</p>
+        <header class="app-header">
+
+            <div class="brand">
+
+                <div class="brand-logo">
+                    <i data-lucide="accessibility"></i>
                 </div>
-            </header>
 
-            <div class="hero-content">
-                <h2>How can we help you today?</h2>
+                <div class="brand-text">
+                    <h1>Thušo AI</h1>
+                    <p>Your accessibility assistant</p>
+                </div>
 
-                <p>
-                    Find government services, explore accessibility
-                    information, or ask Thušo for help.
+            </div>
+
+            <button
+                class="icon-button notification-btn"
+                type="button"
+                aria-label="Notifications"
+            >
+                <i data-lucide="bell"></i>
+            </button>
+
+        </header>
+
+
+        <section class="home-content">
+
+            <div class="welcome-section">
+
+                <p class="welcome-label">
+                    Hello! 👋
                 </p>
 
-                <button id="find-service-btn" class="primary-btn">
-                    Find a Service
+                <h2>
+                    How can Thušo<br>
+                    help you today?
+                </h2>
+
+                <p class="welcome-description">
+                    Choose an option or ask Thušo.
+                </p>
+
+            </div>
+
+
+            <div class="quick-actions">
+
+                <!-- ASK THUSO -->
+
+                <button
+                    class="action-card"
+                    type="button"
+                    onclick="showScreen('ask-screen')"
+                >
+
+                    <div class="action-icon green">
+                        <i data-lucide="mic"></i>
+                    </div>
+
+                    <div class="action-content">
+
+                        <h3>Ask Thušo</h3>
+
+                        <p>
+                            Speak or type your question
+                        </p>
+
+                    </div>
+
+                    <i
+                        data-lucide="chevron-right"
+                        class="action-arrow"
+                    ></i>
+
                 </button>
 
-                <button id="ask-thuso-btn" class="secondary-btn">
-                    Ask Thušo
+
+                <!-- READ SOMETHING -->
+
+                <button
+                    class="action-card"
+                    type="button"
+                    onclick="showScreen('camera-screen')"
+                >
+
+                    <div class="action-icon blue">
+                        <i data-lucide="camera"></i>
+                    </div>
+
+                    <div class="action-content">
+
+                        <h3>Read Something</h3>
+
+                        <p>
+                            Point your camera at a sign
+                        </p>
+
+                    </div>
+
+                    <i
+                        data-lucide="chevron-right"
+                        class="action-arrow"
+                    ></i>
+
                 </button>
+
+
+                <!-- FIND SERVICE -->
+
+                <button
+                    class="action-card"
+                    type="button"
+                    onclick="showScreen('services-screen')"
+                >
+
+                    <div class="action-icon orange">
+                        <i data-lucide="landmark"></i>
+                    </div>
+
+                    <div class="action-content">
+
+                        <h3>Find a Service</h3>
+
+                        <p>
+                            Search for government services
+                        </p>
+
+                    </div>
+
+                    <i
+                        data-lucide="chevron-right"
+                        class="action-arrow"
+                    ></i>
+
+                </button>
+
+
+                <!-- ACCESSIBLE FACILITIES -->
+
+                <button
+                    class="action-card"
+                    type="button"
+                    onclick="showScreen('locations-screen')"
+                >
+
+                    <div class="action-icon purple">
+                        <i data-lucide="map-pin"></i>
+                    </div>
+
+                    <div class="action-content">
+
+                        <h3>Accessible Facilities</h3>
+
+                        <p>
+                            Find ramps, lifts and accessible entrances
+                        </p>
+
+                    </div>
+
+                    <i
+                        data-lucide="chevron-right"
+                        class="action-arrow"
+                    ></i>
+
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         SERVICES SCREEN
+    ========================================== -->
+
+    <main
+        id="services-screen"
+        class="screen"
+    >
+
+        <header class="screen-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('home-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <div class="screen-header-title">
+
+                <h2>Find a Service</h2>
+
+                <p>
+                    Search for government services
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="services-content">
+
+            <!-- Search -->
+
+            <div class="search-container">
+
+                <i data-lucide="search"></i>
+
+                <input
+                    id="service-search"
+                    type="search"
+                    placeholder="Search for a service..."
+                    autocomplete="off"
+                >
+
+                <button
+                    class="search-filter-btn"
+                    type="button"
+                    aria-label="Filter services"
+                >
+                    <i data-lucide="sliders-horizontal"></i>
+                </button>
+
+            </div>
+
+
+            <!-- Filter chips -->
+
+            <div class="filter-chips">
+
+                <button
+                    class="filter-chip active"
+                    type="button"
+                >
+                    All
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    Home Affairs
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    SASSA
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    Health
+                </button>
+
+            </div>
+
+
+            <!-- Existing JS can populate this -->
+
+            <div
+                id="services-list"
+                class="services-list"
+            >
+
+                <!-- Services are loaded by app.js -->
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         LOCATIONS SCREEN
+    ========================================== -->
+
+    <main
+        id="locations-screen"
+        class="screen"
+    >
+
+        <header class="screen-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('home-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <div class="screen-header-title">
+
+                <h2>Accessible Facilities</h2>
+
+                <p>
+                    Find places that work for you
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="locations-content">
+
+            <div class="search-container">
+
+                <i data-lucide="search"></i>
+
+                <input
+                    id="location-search"
+                    type="search"
+                    placeholder="Search for a location..."
+                    autocomplete="off"
+                >
+
+            </div>
+
+
+            <div class="location-filters">
+
+                <button
+                    class="filter-chip active"
+                    type="button"
+                >
+                    All
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    ♿ Wheelchair
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    Ramp
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                >
+                    Elevator
+                </button>
+
+            </div>
+
+
+            <!-- Existing JS can populate this -->
+
+            <div
+                id="locations-list"
+                class="locations-list"
+            >
+
+                <!-- Locations are loaded by app.js -->
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         LOCATION DETAILS SCREEN
+    ========================================== -->
+
+    <main
+        id="location-details-screen"
+        class="screen"
+    >
+
+        <header class="details-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('locations-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <button
+                class="icon-button"
+                type="button"
+                aria-label="Save location"
+            >
+                <i data-lucide="bookmark"></i>
+            </button>
+
+        </header>
+
+
+        <!-- Existing JS can populate this -->
+
+        <div
+            id="location-details"
+            class="location-details"
+        >
+
+            <!-- Location details loaded by app.js -->
+
+        </div>
+
+    </main>
+
+
+
+    <!-- =========================================
+         ASK THUSO / CHAT SCREEN
+    ========================================== -->
+
+    <main
+        id="ask-screen"
+        class="screen chat-screen"
+    >
+
+        <header class="chat-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('home-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+
+            <div class="chat-title">
+
+                <div class="chat-avatar">
+                    <i data-lucide="accessibility"></i>
+                </div>
+
+                <div>
+
+                    <h2>Ask Thušo</h2>
+
+                    <p>
+                        Your accessibility assistant
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                class="icon-button"
+                type="button"
+                aria-label="More options"
+            >
+                <i data-lucide="ellipsis-vertical"></i>
+            </button>
+
+        </header>
+
+
+        <!-- CHAT AREA -->
+
+        <section
+            id="chat-messages"
+            class="chat-messages"
+        >
+
+            <div class="message assistant-message">
+
+                Hello! 👋
+
+                <br><br>
+
+                I’m Thušo, your accessibility assistant.
+                Ask me about government services, accessible
+                facilities, locations, or how to get somewhere.
+
             </div>
 
         </section>
 
 
-        <!-- Services Screen -->
-        <section id="services-screen" class="screen">
+        <!-- CHAT SUGGESTIONS -->
 
-            <button class="back-btn" data-back="home-screen">
-                ← Back
+        <div class="chat-suggestions">
+
+            <button
+                class="suggestion-chip"
+                type="button"
+            >
+                Find Home Affairs
             </button>
 
-            <h2>Government Services</h2>
-
-            <p class="screen-description">
-                Choose the service you need.
-            </p>
-
-            <div id="services-list" class="card-list"></div>
-
-        </section>
-
-
-        <!-- Locations Screen -->
-        <section id="locations-screen" class="screen">
-
-            <button class="back-btn" data-back="services-screen">
-                ← Back
+            <button
+                class="suggestion-chip"
+                type="button"
+            >
+                Find accessible places
             </button>
 
-            <h2 id="selected-service-name">
-                Locations
-            </h2>
-
-            <p class="screen-description">
-                Select a location near you.
-            </p>
-
-            <div id="locations-list" class="card-list"></div>
-
-        </section>
-
-
-        <!-- Location Details Screen -->
-        <section id="location-screen" class="screen">
-
-            <button class="back-btn" data-back="locations-screen">
-                ← Back
-            </button>
-
-            <h2 id="location-name"></h2>
-
-            <p id="location-address"></p>
-
-            <h3>Accessibility Information</h3>
-
-            <div id="accessibility-info"></div>
-
-            <button id="directions-btn" class="primary-btn"> 
-                Get Directions 
-            </button>
-
-        </section>
-
-        <!-- Ask Thušo Screen -->
-<section id="ask-screen" class="screen">
-
-    <button class="back-btn" data-back="home-screen">
-        ← Back
-    </button>
-
-    <h2>Ask Thušo</h2>
-
-    <p class="screen-description">
-        Ask a question about government services or accessibility.
-    </p>
-
-    <label class="voice-toggle">
-        <input
-            type="checkbox"
-            id="voice-output-toggle"
-            checked
-        >
-        🔊 Read responses aloud
-    </label>
-
-    <div id="chat-messages" class="chat-messages">
-
-        <div class="message assistant-message">
-            Hello! 👋 I'm Thušo. How can I help you today?
         </div>
 
-    </div>
 
-    <form id="chat-form" class="chat-form">
+        <!-- CHAT INPUT -->
 
-        <input
-            type="text"
-            id="chat-input"
-            placeholder="Type or speak your question..."
-            autocomplete="off"
+        <form
+            id="chat-form"
+            class="chat-form"
         >
 
-        <button
-            type="button"
-            id="voice-input-btn"
-            aria-label="Speak your question"
-            title="Speak your question"
-        >
-            🎤
-        </button>
+            <input
+                id="chat-input"
+                type="text"
+                placeholder="Ask Thušo anything..."
+                autocomplete="off"
+            >
 
-        <button type="submit">
-            Send
-        </button>
 
-    </form>
+            <button
+                id="voice-btn"
+                class="voice-btn"
+                type="button"
+                aria-label="Speak your message"
+            >
+                <i data-lucide="mic"></i>
+            </button>
 
-</section>
+
+            <button
+                class="send-btn"
+                type="submit"
+                aria-label="Send message"
+            >
+                <i data-lucide="send"></i>
+            </button>
+
+        </form>
 
     </main>
 
-    <script src="app.js"></script>
+
+
+    <!-- =========================================
+         CAMERA / READ SOMETHING
+    ========================================== -->
+
+    <main
+        id="camera-screen"
+        class="screen camera-screen"
+    >
+
+        <header class="camera-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('home-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <h2>Read Something</h2>
+
+            <button
+                class="icon-button"
+                type="button"
+                aria-label="More options"
+            >
+                <i data-lucide="ellipsis-vertical"></i>
+            </button>
+
+        </header>
+
+
+        <section class="camera-content">
+
+            <div class="camera-preview">
+
+                <div class="scan-frame">
+
+                    <i data-lucide="scan-text"></i>
+
+                    <p>
+                        Focus on text or a sign
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <p class="camera-instruction">
+
+                Point your camera at the sign or text
+                you would like Thušo to read.
+
+            </p>
+
+
+            <div class="camera-controls">
+
+                <button
+                    class="camera-small-btn"
+                    type="button"
+                    aria-label="Open gallery"
+                >
+                    <i data-lucide="image"></i>
+                </button>
+
+
+                <button
+                    class="capture-btn"
+                    type="button"
+                    aria-label="Capture image"
+                >
+                    <span></span>
+                </button>
+
+
+                <button
+                    class="camera-small-btn"
+                    type="button"
+                    aria-label="Toggle flash"
+                >
+                    <i data-lucide="zap"></i>
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         SAVED PLACES SCREEN
+    ========================================== -->
+
+    <main
+        id="saved-screen"
+        class="screen"
+    >
+
+        <header class="screen-header">
+
+            <div class="screen-header-title">
+
+                <h2>Saved Places</h2>
+
+                <p>
+                    Your saved locations
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="saved-content">
+
+            <div class="empty-state">
+
+                <div class="empty-icon">
+                    <i data-lucide="bookmark"></i>
+                </div>
+
+                <h3>No saved places yet</h3>
+
+                <p>
+                    Save locations so you can quickly
+                    find them later.
+                </p>
+
+                <button
+                    class="primary-btn"
+                    type="button"
+                    onclick="showScreen('locations-screen')"
+                >
+                    Find Places
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         PREFERENCES SCREEN
+    ========================================== -->
+
+    <main
+        id="preferences-screen"
+        class="screen"
+    >
+
+        <header class="screen-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('menu-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <div class="screen-header-title">
+
+                <h2>My Preferences</h2>
+
+                <p>
+                    Personalise your experience
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="preferences-content">
+
+            <!-- Accessibility -->
+
+            <div class="preference-section">
+
+                <h3>Accessibility Needs</h3>
+
+                <p>
+                    Select what is important to you
+                </p>
+
+
+                <div class="preference-chips">
+
+                    <button
+                        class="preference-chip"
+                        type="button"
+                    >
+                        👁 Low Vision
+                    </button>
+
+                    <button
+                        class="preference-chip selected"
+                        type="button"
+                    >
+                        ◉ Blind
+                    </button>
+
+                    <button
+                        class="preference-chip"
+                        type="button"
+                    >
+                        🦻 Deaf
+                    </button>
+
+                    <button
+                        class="preference-chip"
+                        type="button"
+                    >
+                        ♿ Mobility
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- Communication -->
+
+            <div class="preference-section">
+
+                <h3>Communication</h3>
+
+
+                <div class="setting-row">
+
+                    <div class="setting-info">
+
+                        <div class="setting-icon">
+                            <i data-lucide="volume-2"></i>
+                        </div>
+
+                        <div>
+                            <strong>Voice responses</strong>
+                            <span>Read responses aloud</span>
+                        </div>
+
+                    </div>
+
+                    <button
+                        class="toggle active"
+                        type="button"
+                        aria-label="Toggle voice responses"
+                    >
+                        <span></span>
+                    </button>
+
+                </div>
+
+
+                <div class="setting-row">
+
+                    <div class="setting-info">
+
+                        <div class="setting-icon">
+                            <i data-lucide="languages"></i>
+                        </div>
+
+                        <div>
+                            <strong>South African Sign Language</strong>
+                            <span>SASL support</span>
+                        </div>
+
+                    </div>
+
+                    <button
+                        class="toggle"
+                        type="button"
+                        aria-label="Toggle sign language"
+                    >
+                        <span></span>
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- Language -->
+
+            <div class="preference-section">
+
+                <h3>Language</h3>
+
+                <p>
+                    Choose your preferred language
+                </p>
+
+                <select
+                    id="language-select"
+                    class="select-input"
+                >
+
+                    <option value="en">
+                        English
+                    </option>
+
+                    <option value="af">
+                        Afrikaans
+                    </option>
+
+                    <option value="zu">
+                        isiZulu
+                    </option>
+
+                    <option value="xh">
+                        isiXhosa
+                    </option>
+
+                    <option value="nso">
+                        Sepedi
+                    </option>
+
+                    <option value="tn">
+                        Setswana
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Text size -->
+
+            <div class="preference-section">
+
+                <h3>Text Size</h3>
+
+                <p>
+                    Adjust the size of text
+                </p>
+
+                <div class="text-size-control">
+
+                    <span>A</span>
+
+                    <input
+                        id="text-size"
+                        type="range"
+                        min="14"
+                        max="22"
+                        value="16"
+                    >
+
+                    <span class="large-a">A</span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         MENU SCREEN
+    ========================================== -->
+
+    <main
+        id="menu-screen"
+        class="screen"
+    >
+
+        <header class="menu-header">
+
+            <div class="brand">
+
+                <div class="brand-logo">
+                    <i data-lucide="accessibility"></i>
+                </div>
+
+                <div class="brand-text">
+                    <h1>Thušo AI</h1>
+                    <p>Your accessibility assistant</p>
+                </div>
+
+            </div>
+
+
+            <button
+                class="icon-button"
+                type="button"
+                aria-label="Toggle theme"
+            >
+                <i data-lucide="sun"></i>
+            </button>
+
+        </header>
+
+
+        <section class="menu-content">
+
+            <button
+                class="menu-item"
+                type="button"
+                onclick="showScreen('preferences-screen')"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="settings"></i>
+                    </div>
+
+                    <span>My Preferences</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="menu-item"
+                type="button"
+                onclick="showScreen('saved-screen')"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="bookmark"></i>
+                    </div>
+
+                    <span>Saved Places</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="menu-item"
+                type="button"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="history"></i>
+                    </div>
+
+                    <span>History</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="menu-item"
+                type="button"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="circle-help"></i>
+                    </div>
+
+                    <span>Help & Support</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="menu-item"
+                type="button"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="info"></i>
+                    </div>
+
+                    <span>About Thušo AI</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="menu-item"
+                type="button"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="message-square"></i>
+                    </div>
+
+                    <span>Send Feedback</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
+
+
+            <button
+                class="emergency-button"
+                type="button"
+            >
+
+                <i data-lucide="phone-call"></i>
+
+                <span>Emergency Help</span>
+
+            </button>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
+         BOTTOM NAVIGATION
+    ========================================== -->
+
+    <nav
+        id="bottom-nav"
+        class="bottom-nav"
+    >
+
+        <button
+            class="nav-item active"
+            type="button"
+            data-screen="home-screen"
+            onclick="showScreen('home-screen')"
+        >
+
+            <i data-lucide="house"></i>
+
+            <span>Home</span>
+
+        </button>
+
+
+        <button
+            class="nav-item"
+            type="button"
+            data-screen="services-screen"
+            onclick="showScreen('services-screen')"
+        >
+
+            <i data-lucide="layout-grid"></i>
+
+            <span>Services</span>
+
+        </button>
+
+
+        <button
+            class="nav-item nav-ask"
+            type="button"
+            data-screen="ask-screen"
+            onclick="showScreen('ask-screen')"
+        >
+
+            <div class="nav-ask-icon">
+                <i data-lucide="message-circle"></i>
+            </div>
+
+            <span>Ask</span>
+
+        </button>
+
+
+        <button
+            class="nav-item"
+            type="button"
+            data-screen="saved-screen"
+            onclick="showScreen('saved-screen')"
+        >
+
+            <i data-lucide="bookmark"></i>
+
+            <span>Saved</span>
+
+        </button>
+
+
+        <button
+            class="nav-item"
+            type="button"
+            data-screen="menu-screen"
+            onclick="showScreen('menu-screen')"
+        >
+
+            <i data-lucide="menu"></i>
+
+            <span>Menu</span>
+
+        </button>
+
+    </nav>
+
+</div>
+
+
+<!-- Existing application logic -->
+<script src="app.js"></script>
+
+
+<!-- Initialise Lucide icons -->
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
 
 </body>
 </html>
