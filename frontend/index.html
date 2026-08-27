@@ -24,6 +24,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Browser OCR engine used by the Read Something camera. -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
     <!-- Main stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -57,14 +60,21 @@
             </div>
 
             <button
-                class="icon-button notification-btn"
+                id="hands-free-btn"
+                class="icon-button hands-free-btn"
                 type="button"
-                aria-label="Notifications"
+                aria-label="Hands free voice assistant"
             >
-                <i data-lucide="bell"></i>
+                <i data-lucide="mic"></i>
+                <span>Hands Free</span>
             </button>
 
         </header>
+
+        <div class="hands-free-status-bar" aria-live="polite">
+            <span class="status-dot"></span>
+            <span id="hands-free-status">Hands free ready.</span>
+        </div>
 
 
         <section class="home-content">
@@ -277,11 +287,12 @@
 
             <!-- Filter chips -->
 
-            <div class="filter-chips">
+            <div id="service-filter-chips" class="filter-chips">
 
                 <button
                     class="filter-chip active"
                     type="button"
+                    data-filter="all"
                 >
                     All
                 </button>
@@ -289,6 +300,7 @@
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="home affairs"
                 >
                     Home Affairs
                 </button>
@@ -296,6 +308,7 @@
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="sassa"
                 >
                     SASSA
                 </button>
@@ -303,6 +316,7 @@
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="health"
                 >
                     Health
                 </button>
@@ -376,11 +390,12 @@
             </div>
 
 
-            <div class="location-filters">
+            <div id="location-filter-chips" class="location-filters">
 
                 <button
                     class="filter-chip active"
                     type="button"
+                    data-filter="all"
                 >
                     All
                 </button>
@@ -388,6 +403,7 @@
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="wheelchairAccessible"
                 >
                     ♿ Wheelchair
                 </button>
@@ -395,15 +411,25 @@
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="accessibleEntrance"
                 >
-                    Ramp
+                    Accessible Entrance
                 </button>
 
                 <button
                     class="filter-chip"
                     type="button"
+                    data-filter="audioGuidance"
                 >
-                    Elevator
+                    Audio Guidance
+                </button>
+
+                <button
+                    class="filter-chip"
+                    type="button"
+                    data-filter="signLanguageSupport"
+                >
+                    Sign Language Support
                 </button>
 
             </div>
@@ -642,12 +668,29 @@
 
             <div class="camera-preview">
 
+                <video
+                    id="camera-video"
+                    autoplay
+                    muted
+                    playsinline
+                    aria-label="Live camera preview"
+                ></video>
+
+                <canvas
+                    id="camera-canvas"
+                    aria-hidden="true"
+                ></canvas>
+
                 <div class="scan-frame">
 
                     <i data-lucide="scan-text"></i>
 
                     <p>
                         Focus on text or a sign
+                    </p>
+
+                    <p id="ocr-status" aria-live="polite">
+                        Starting camera...
                     </p>
 
                 </div>
@@ -666,6 +709,7 @@
             <div class="camera-controls">
 
                 <button
+                    id="gallery-btn"
                     class="camera-small-btn"
                     type="button"
                     aria-label="Open gallery"
@@ -675,6 +719,7 @@
 
 
                 <button
+                    id="capture-btn"
                     class="capture-btn"
                     type="button"
                     aria-label="Capture image"
@@ -684,6 +729,7 @@
 
 
                 <button
+                    id="flash-btn"
                     class="camera-small-btn"
                     type="button"
                     aria-label="Toggle flash"
@@ -692,6 +738,13 @@
                 </button>
 
             </div>
+
+            <input
+                id="gallery-input"
+                type="file"
+                accept="image/*"
+                hidden
+            >
 
         </section>
 
@@ -867,31 +920,62 @@
 
                 </div>
 
-
+                <!-- Reads the accessible name of each pressed button aloud. -->
                 <div class="setting-row">
 
                     <div class="setting-info">
 
                         <div class="setting-icon">
-                            <i data-lucide="languages"></i>
+                            <i data-lucide="volume-1"></i>
                         </div>
 
                         <div>
-                            <strong>South African Sign Language</strong>
-                            <span>SASL support</span>
+                            <strong>Read aloud</strong>
+                            <span>Read buttons when selected</span>
                         </div>
 
                     </div>
 
                     <button
+                        id="read-aloud-toggle"
                         class="toggle"
                         type="button"
-                        aria-label="Toggle sign language"
+                        aria-label="Toggle read aloud"
+                        aria-pressed="false"
                     >
                         <span></span>
                     </button>
 
                 </div>
+
+                <!-- High contrast is controlled here and by hands-free commands. -->
+                <div class="setting-row">
+
+                    <div class="setting-info">
+
+                        <div class="setting-icon">
+                            <i data-lucide="contrast"></i>
+                        </div>
+
+                        <div>
+                            <strong>High contrast</strong>
+                            <span>Increase colour contrast</span>
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="high-contrast-toggle"
+                        class="toggle"
+                        type="button"
+                        aria-label="Toggle high contrast"
+                        aria-pressed="false"
+                    >
+                        <span></span>
+                    </button>
+
+                </div>
+
 
             </div>
 
@@ -999,14 +1083,6 @@
             </div>
 
 
-            <button
-                class="icon-button"
-                type="button"
-                aria-label="Toggle theme"
-            >
-                <i data-lucide="sun"></i>
-            </button>
-
         </header>
 
 
@@ -1055,88 +1131,10 @@
 
 
             <button
-                class="menu-item"
-                type="button"
-            >
-
-                <div class="menu-item-left">
-
-                    <div class="menu-icon">
-                        <i data-lucide="history"></i>
-                    </div>
-
-                    <span>History</span>
-
-                </div>
-
-                <i data-lucide="chevron-right"></i>
-
-            </button>
-
-
-            <button
-                class="menu-item"
-                type="button"
-            >
-
-                <div class="menu-item-left">
-
-                    <div class="menu-icon">
-                        <i data-lucide="circle-help"></i>
-                    </div>
-
-                    <span>Help & Support</span>
-
-                </div>
-
-                <i data-lucide="chevron-right"></i>
-
-            </button>
-
-
-            <button
-                class="menu-item"
-                type="button"
-            >
-
-                <div class="menu-item-left">
-
-                    <div class="menu-icon">
-                        <i data-lucide="info"></i>
-                    </div>
-
-                    <span>About Thušo AI</span>
-
-                </div>
-
-                <i data-lucide="chevron-right"></i>
-
-            </button>
-
-
-            <button
-                class="menu-item"
-                type="button"
-            >
-
-                <div class="menu-item-left">
-
-                    <div class="menu-icon">
-                        <i data-lucide="message-square"></i>
-                    </div>
-
-                    <span>Send Feedback</span>
-
-                </div>
-
-                <i data-lucide="chevron-right"></i>
-
-            </button>
-
-
-            <button
+                id="emergency-help-btn"
                 class="emergency-button"
                 type="button"
+                aria-label="Emergency help"
             >
 
                 <i data-lucide="phone-call"></i>

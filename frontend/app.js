@@ -27,9 +27,18 @@ let currentLocation = null;
 let currentService = null;
 
 let voiceOutputEnabled = true;
+let readAloudEnabled = false;
+let mobilityPreferenceEnabled = false;
+let appLanguage = "en";
+let currentUserPosition = null;
 let recognition = null;
+let handsFreeRecognition = null;
 let isListening = false;
 let isAssistantSpeaking = false;
+let handsFreeModeActive = false;
+let handsFreeListenTimer = null;
+let cameraStream = null;
+let isOcrProcessing = false;
 
 
 /* =========================================================
@@ -75,6 +84,1008 @@ function escapeHtml(value = "") {
 }
 
 
+function normaliseVoiceCommand(value = "") {
+    return String(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+
+function updateHandsFreeStatus(message) {
+    const status = getById("hands-free-status");
+
+    if (!status) return;
+
+    status.textContent = message;
+}
+
+
+function setHighContrastMode(enabled) {
+    const isEnabled = !!enabled;
+
+    document.body.classList.toggle(
+        "high-contrast-mode",
+        isEnabled
+    );
+
+    // Keep the visible preference toggle aligned with voice commands.
+    const contrastToggle = getById("high-contrast-toggle");
+    contrastToggle?.classList.toggle("active", isEnabled);
+    contrastToggle?.setAttribute("aria-pressed", String(isEnabled));
+
+    const status = isEnabled
+        ? "High contrast enabled."
+        : "High contrast disabled.";
+
+    updateHandsFreeStatus(status);
+    speakText(status);
+}
+
+
+function setReadAloudMode(enabled) {
+    readAloudEnabled = !!enabled;
+
+    const readAloudToggle = getById("read-aloud-toggle");
+    readAloudToggle?.classList.toggle("active", readAloudEnabled);
+    readAloudToggle?.setAttribute("aria-pressed", String(readAloudEnabled));
+
+    if (readAloudEnabled) {
+        voiceOutputEnabled = true;
+    }
+}
+
+
+function speakButtonLabel(button) {
+    if (!readAloudEnabled || !button || button.id === "read-aloud-toggle") {
+        return;
+    }
+
+    const label = button.getAttribute("aria-label") || button.innerText.trim();
+    if (label) {
+        speakText(label);
+    }
+}
+
+
+function calculateDistanceInKilometres(from, to) {
+    const earthRadius = 6371;
+    const toRadians = degrees => degrees * Math.PI / 180;
+
+    if (
+        !Number.isFinite(from.latitude) ||
+        !Number.isFinite(from.longitude) ||
+        !Number.isFinite(to.latitude) ||
+        !Number.isFinite(to.longitude)
+    ) {
+        return null;
+    }
+
+    const latitudeDifference = toRadians(to.latitude - from.latitude);
+    const longitudeDifference = toRadians(to.longitude - from.longitude);
+    const latitude = toRadians(from.latitude);
+    const haversine = Math.sin(latitudeDifference / 2) ** 2 +
+        Math.cos(latitude) * Math.cos(toRadians(to.latitude)) *
+        Math.sin(longitudeDifference / 2) ** 2;
+
+    const boundedHaversine = Math.min(1, Math.max(0, haversine));
+
+    return earthRadius * 2 * Math.atan2(
+        Math.sqrt(boundedHaversine),
+        Math.sqrt(1 - boundedHaversine)
+    );
+}
+
+
+function formatDistance(distanceInKilometres) {
+    return distanceInKilometres < 1
+        ? `${Math.round(distanceInKilometres * 1000)} m away`
+        : `${distanceInKilometres.toFixed(1)} km away`;
+}
+
+
+function updateLocationCardDistances() {
+    if (!currentUserPosition) return;
+
+    document.querySelectorAll("#locations-list .location-card").forEach(card => {
+        const latitude = Number(card.dataset.latitude);
+        const longitude = Number(card.dataset.longitude);
+        const distanceElement = card.querySelector(".location-distance");
+
+        if (!distanceElement || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return;
+        }
+
+        const distance = calculateDistanceInKilometres(
+            currentUserPosition,
+            { latitude, longitude }
+        );
+
+        if (distance === null) return;
+
+        distanceElement.textContent = formatDistance(distance);
+        distanceElement.hidden = false;
+    });
+}
+
+
+function requestCurrentLocation() {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            currentUserPosition = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
+            updateLocationCardDistances();
+        },
+        error => console.info("Current location is unavailable:", error.message),
+        { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 }
+    );
+}
+
+
+function changeTextSize(delta) {
+    const textSizeInput = getById("text-size");
+    const currentValue = Number(
+        textSizeInput?.value || 16
+    );
+    const nextValue = Math.min(
+        22,
+        Math.max(14, currentValue + delta)
+    );
+
+    document.documentElement.style.fontSize = `${nextValue}px`;
+
+    if (textSizeInput) {
+        textSizeInput.value = String(nextValue);
+    }
+
+    const status = `Text size set to ${nextValue}px.`;
+    updateHandsFreeStatus(status);
+    speakText(status);
+}
+
+
+function stopHandsFreeMode() {
+    handsFreeModeActive = false;
+
+    if (handsFreeListenTimer) {
+        clearTimeout(handsFreeListenTimer);
+        handsFreeListenTimer = null;
+    }
+
+    if (handsFreeRecognition) {
+        try {
+            handsFreeRecognition.stop();
+        } catch (error) {
+            console.warn("Unable to stop hands free recognition:", error);
+        }
+    }
+
+    const handsFreeButton = getById("hands-free-btn");
+
+    if (handsFreeButton) {
+        handsFreeButton.classList.remove("recording");
+    }
+
+    updateHandsFreeStatus("Hands free mode off.");
+}
+
+
+function resumeHandsFreeListening() {
+    if (!handsFreeModeActive || !handsFreeRecognition || isAssistantSpeaking) {
+        return;
+    }
+
+    try {
+        handsFreeRecognition.start();
+    } catch (error) {
+        console.warn("Unable to resume hands free recognition:", error);
+    }
+}
+
+
+function setServiceFilterByName(filterName) {
+    const target = String(filterName || "")
+        .trim()
+        .toLowerCase();
+
+    if (!target) return false;
+
+    const filterChip = [...document.querySelectorAll(".filter-chip")]
+        .find(chip => {
+            const value = (
+                chip.dataset.filter ||
+                chip.textContent.trim()
+            ).toLowerCase();
+
+            return value === target ||
+                chip.textContent.toLowerCase().includes(target) ||
+                (target === "health" && value.includes("health"));
+        });
+
+    if (!filterChip) return false;
+
+    document.querySelectorAll(".filter-chip").forEach(chip => {
+        chip.classList.toggle("active", chip === filterChip);
+    });
+
+    applyServiceFilters();
+    return true;
+}
+
+
+function applyServiceFilters() {
+    const serviceSearch = getById("service-search");
+    const query = (serviceSearch?.value || "").toLowerCase().trim();
+
+    const activeFilterChip = document.querySelector("#service-filter-chips .filter-chip.active");
+    const selectedFilter = (activeFilterChip?.dataset.filter || "all").toLowerCase();
+
+    document.querySelectorAll("#services-list .service-card").forEach(card => {
+        const serviceName = (card.dataset.name || "").toLowerCase();
+        const serviceCategory = (card.dataset.category || "").toLowerCase();
+        const cardText = `${serviceName} ${serviceCategory} ${(card.dataset.search || "")}`.toLowerCase();
+
+        const matchesFilter =
+            selectedFilter === "all" ||
+            serviceName === selectedFilter ||
+            serviceCategory.includes(selectedFilter) ||
+            serviceName.includes(selectedFilter);
+
+        const matchesSearch = !query || cardText.includes(query);
+
+        card.style.display = matchesFilter && matchesSearch ? "" : "none";
+    });
+}
+
+
+function setLocationFilterByName(filterName) {
+    const target = String(filterName || "").trim().toLowerCase();
+
+    if (!target) return false;
+
+    const filterChip = [...document.querySelectorAll("#location-filter-chips .filter-chip")].find(chip => {
+        const value = (chip.dataset.filter || chip.textContent.trim()).toLowerCase();
+        return value === target || chip.textContent.toLowerCase().includes(target);
+    });
+
+    if (!filterChip) return false;
+
+    document.querySelectorAll("#location-filter-chips .filter-chip").forEach(chip => {
+        chip.classList.toggle("active", chip === filterChip);
+    });
+
+    applyLocationFilters();
+    return true;
+}
+
+
+function applyLocationFilters() {
+    const locationSearch = getById("location-search");
+    const query = (locationSearch?.value || "").toLowerCase().trim();
+    const activeFilterChip = document.querySelector("#location-filter-chips .filter-chip.active");
+    const selectedFilter = activeFilterChip?.dataset.filter || "all";
+
+    document.querySelectorAll("#locations-list .location-card").forEach(card => {
+        const name = (card.dataset.name || "").toLowerCase();
+        const address = (card.dataset.address || "").toLowerCase();
+        const city = (card.dataset.city || "").toLowerCase();
+        const cardText = `${name} ${address} ${city}`.toLowerCase();
+
+        const matchesFilter =
+            selectedFilter === "all" ||
+            card.dataset[selectedFilter] === "true";
+
+        const matchesSearch = !query || cardText.includes(query);
+
+        card.style.display = matchesFilter && matchesSearch ? "" : "none";
+    });
+
+    if (mobilityPreferenceEnabled && selectedFilter === "all") {
+        const visibleCards = [...document.querySelectorAll("#locations-list .location-card")]
+            .filter(card => card.style.display !== "none");
+        visibleCards.sort((firstCard, secondCard) =>
+            Number(secondCard.dataset.wheelchairAccessible === "true") -
+            Number(firstCard.dataset.wheelchairAccessible === "true")
+        );
+        const locationsList = getById("locations-list");
+        visibleCards.forEach(card => locationsList?.appendChild(card));
+    }
+}
+
+
+function getCityFromVoiceCommand(command) {
+    const cityMap = {
+        polokwane: "Polokwane",
+        seshego: "Seshego",
+        lebowakgomo: "Lebowakgomo",
+        mokopane: "Mokopane",
+        tzaneen: "Tzaneen",
+        giyani: "Giyani",
+        thohoyandou: "Thohoyandou",
+        "louis trichardt": "Louis Trichardt",
+        musina: "Musina",
+        burgersfort: "Burgersfort",
+        "jane furse": "Jane Furse",
+        "janefurse": "Jane Furse",
+        "makhado": "Louis Trichardt",
+        "sibasa": "Thohoyandou",
+        "groot letaba": "Tzaneen"
+    };
+
+    const commandText = normaliseVoiceCommand(command);
+
+    for (const [key, value] of Object.entries(cityMap)) {
+        if (commandText.includes(key)) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+
+function getServiceFromVoiceCommand(command) {
+    const serviceMap = {
+        "home affairs": "home affairs",
+        "home affairs office": "home affairs",
+        "id office": "home affairs",
+        "passport office": "home affairs",
+        "birth certificate": "home affairs",
+        "grant": "sassa",
+        "sassa": "sassa",
+        "social grant": "sassa",
+        "health": "health",
+        "clinic": "health",
+        "hospital": "health",
+        "doctor": "health",
+        "medical": "health",
+        "municipality": "municipal services",
+        "municipal services": "municipal services",
+        "rates": "municipal services",
+        "water": "municipal services",
+        "electricity": "municipal services",
+        "education": "education",
+        "school": "education",
+        "bursary": "education",
+        "university": "education"
+    };
+
+    const commandText = normaliseVoiceCommand(command);
+
+    for (const [key, value] of Object.entries(serviceMap)) {
+        if (commandText.includes(key)) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+
+function getAccessibilityFilterFromVoiceCommand(command) {
+    const commandText = normaliseVoiceCommand(command);
+
+    if (
+        commandText.includes("wheelchair") ||
+        commandText.includes("wheel chair") ||
+        commandText.includes("mobility") ||
+        commandText.includes("accessibility") && commandText.includes("wheelchair")
+    ) {
+        return "wheelchair";
+    }
+
+    if (
+        commandText.includes("ramp") ||
+        commandText.includes("step free") ||
+        commandText.includes("level access")
+    ) {
+        return "ramp";
+    }
+
+    if (
+        commandText.includes("elevator") ||
+        commandText.includes("lift")
+    ) {
+        return "elevator";
+    }
+
+    if (
+        commandText.includes("audio") ||
+        commandText.includes("voice guidance") ||
+        commandText.includes("audio guidance")
+    ) {
+        return "audio";
+    }
+
+    if (
+        commandText.includes("sign language") ||
+        commandText.includes("sign language support") ||
+        commandText.includes("deaf") ||
+        commandText.includes("hearing")
+    ) {
+        return "sign";
+    }
+
+    if (
+        commandText.includes("accessible entrance") ||
+        commandText.includes("easy entry") ||
+        commandText.includes("step free entrance")
+    ) {
+        return "entrance";
+    }
+
+    return "all";
+}
+
+
+function executeHandsFreeCommand(rawCommand) {
+    const command = normaliseVoiceCommand(rawCommand);
+
+    if (!command) {
+        return false;
+    }
+
+    const matchesAny = (terms) =>
+        terms.some(term => command.includes(term));
+
+    if (
+        matchesAny([
+            "increase text size",
+            "make text bigger",
+            "bigger text",
+            "larger text",
+            "text bigger"
+        ]) || (
+            command.includes("text size") &&
+            /(up|increase|larger|bigger|more)/.test(command)
+        )
+    ) {
+        changeTextSize(1);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "decrease text size",
+            "make text smaller",
+            "smaller text",
+            "reduce text size",
+            "text smaller"
+        ]) || (
+            command.includes("text size") &&
+            /(down|decrease|smaller|less|reduce)/.test(command)
+        )
+    ) {
+        changeTextSize(-1);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "turn on high contrast",
+            "enable high contrast",
+            "activate high contrast",
+            "high contrast on",
+            "turn on contrast",
+            "enable contrast",
+            "activate contrast",
+            "contrast on"
+        ]) || (
+            command.includes("contrast") &&
+            /(on|enable|activate|light|bright)/.test(command)
+        )
+    ) {
+        setHighContrastMode(true);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "turn off high contrast",
+            "disable high contrast",
+            "deactivate high contrast",
+            "high contrast off",
+            "turn off contrast",
+            "disable contrast",
+            "deactivate contrast",
+            "contrast off",
+            "normal contrast",
+            "low contrast"
+        ]) || (
+            command.includes("contrast") &&
+            /(off|disable|deactivate|normal|low)/.test(command)
+        )
+    ) {
+        setHighContrastMode(false);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "turn on voice responses",
+            "enable voice responses",
+            "activate voice responses",
+            "turn on speech",
+            "turn on voice output"
+        ]) || (
+            command.includes("voice") &&
+            /on|enable|activate/.test(command)
+        )
+    ) {
+        voiceOutputEnabled = true;
+        const status = "Voice responses enabled.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "turn off voice responses",
+            "disable voice responses",
+            "deactivate voice responses",
+            "turn off speech",
+            "turn off voice output"
+        ]) || (
+            command.includes("voice") &&
+            /off|disable|deactivate/.test(command)
+        )
+    ) {
+        voiceOutputEnabled = false;
+        const status = "Voice responses disabled.";
+        updateHandsFreeStatus(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open home",
+            "go home",
+            "show home",
+            "home screen",
+            "return home",
+            "back home"
+        ])
+    ) {
+        showScreen("home-screen");
+        const status = "Opening home.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show home affairs",
+            "open home affairs",
+            "home affairs",
+            "find home affairs",
+            "home affairs office"
+        ])
+    ) {
+        showScreen("services-screen");
+        setServiceFilterByName("home affairs");
+        const status = "Opening Home Affairs services.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show sassa",
+            "open sassa",
+            "sassa",
+            "find sassa",
+            "social grant office"
+        ])
+    ) {
+        showScreen("services-screen");
+        setServiceFilterByName("sassa");
+        const status = "Opening SASSA services.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show health",
+            "open health",
+            "department of health",
+            "health services",
+            "find clinic",
+            "find hospital",
+            "medical help"
+        ])
+    ) {
+        showScreen("services-screen");
+        setServiceFilterByName("health");
+        const status = "Opening health services.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open services",
+            "show services",
+            "find service",
+            "go to services",
+            "service list",
+            "government services"
+        ])
+    ) {
+        showScreen("services-screen");
+        const status = "Opening services.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open locations",
+            "show locations",
+            "accessible facilities",
+            "find places",
+            "show accessible places",
+            "open accessible facilities",
+            "show nearby places"
+        ])
+    ) {
+        showScreen("locations-screen");
+        const status = "Opening accessible locations.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show wheelchair",
+            "wheelchair accessible",
+            "show wheelchair accessible",
+            "find wheelchair friendly place",
+            "find wheelchair access",
+            "look for wheelchair"
+        ])
+    ) {
+        showScreen("locations-screen");
+        setLocationFilterByName("wheelchairAccessible");
+        const status = "Showing wheelchair accessible locations.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show ramp access",
+            "ramp accessible",
+            "step free places",
+            "level access",
+            "show step free locations"
+        ])
+    ) {
+        showScreen("locations-screen");
+        setLocationFilterByName("accessibleEntrance");
+        const status = "Showing step-free and ramp-accessible locations.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show elevator",
+            "lift access",
+            "elevator access",
+            "find lift places"
+        ])
+    ) {
+        showScreen("locations-screen");
+        setLocationFilterByName("accessibleEntrance");
+        const status = "Showing elevator-accessible locations.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show audio guidance",
+            "audio guidance locations",
+            "voice guided places",
+            "audio assisted locations"
+        ])
+    ) {
+        showScreen("locations-screen");
+        setLocationFilterByName("audioGuidance");
+        const status = "Showing locations with audio guidance.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "show sign language",
+            "sign language support",
+            "deaf accessible",
+            "hearing friendly places"
+        ])
+    ) {
+        showScreen("locations-screen");
+        setLocationFilterByName("signLanguageSupport");
+        const status = "Showing locations with sign language support.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    const city = getCityFromVoiceCommand(command);
+    const service = getServiceFromVoiceCommand(command);
+    const accessibility = getAccessibilityFilterFromVoiceCommand(command);
+
+    if (service || city || accessibility !== "all") {
+        showScreen("locations-screen");
+
+        if (service) {
+            setServiceFilterByName(service);
+        }
+
+        if (accessibility !== "all") {
+            const mappedFilter = accessibility === "audio" ? "audio" : accessibility === "sign" ? "sign" : accessibility === "entrance" ? "all" : accessibility;
+            if (mappedFilter !== "all") {
+                setLocationFilterByName(mappedFilter);
+            }
+        }
+
+        if (city) {
+            const locationSearch = getById("location-search");
+            if (locationSearch) {
+                locationSearch.value = city;
+            }
+            applyLocationFilters();
+        }
+
+        const status = service
+            ? `Showing ${service} locations${city ? ` in ${city}` : ""}.`
+            : city
+                ? `Showing locations in ${city}.`
+                : "Showing accessible locations.";
+
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open ask",
+            "open chat",
+            "ask thušo",
+            "talk to thušo",
+            "start chat"
+        ])
+    ) {
+        showScreen("ask-screen");
+        const status = "Opening chat.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open menu",
+            "show menu",
+            "open settings",
+            "show settings",
+            "go to menu",
+            "main menu"
+        ])
+    ) {
+        showScreen("menu-screen");
+        const status = "Opening menu.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open preferences",
+            "show preferences",
+            "my preferences",
+            "go to preferences",
+            "accessibility settings"
+        ])
+    ) {
+        showScreen("preferences-screen");
+        const status = "Opening preferences.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "open saved",
+            "show saved",
+            "saved places",
+            "my saved places"
+        ])
+    ) {
+        showScreen("saved-screen");
+        const status = "Opening saved places.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "stop hands free",
+            "exit hands free",
+            "close hands free",
+            "finish hands free",
+            "deactivate hands free",
+            "turn off hands free"
+        ])
+    ) {
+        stopHandsFreeMode();
+        return true;
+    }
+
+    if (
+        matchesAny([
+            "help",
+            "what can you do",
+            "what can i say",
+            "voice help",
+            "show commands"
+        ])
+    ) {
+        const status =
+            "Try open home, open services, open chat, find home affairs, show wheelchair accessible places, increase text size, decrease text size, or turn on high contrast.";
+
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+    }
+
+    return false;
+}
+
+
+function initialiseHandsFreeControls() {
+    const handsFreeButton = getById("hands-free-btn");
+
+    if (!handsFreeButton) return;
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        handsFreeButton.disabled = true;
+        handsFreeButton.title = "Speech recognition is not supported in this browser.";
+        handsFreeButton.innerHTML = `
+            <i data-lucide="mic-off"></i>
+            <span>Hands Free</span>
+        `;
+        refreshIcons();
+        updateHandsFreeStatus("Hands free unavailable in this browser.");
+        return;
+    }
+
+    handsFreeRecognition = new SpeechRecognition();
+    handsFreeRecognition.lang = "en-ZA";
+    handsFreeRecognition.continuous = false;
+    handsFreeRecognition.interimResults = false;
+
+    handsFreeRecognition.addEventListener(
+        "start",
+        () => {
+            handsFreeModeActive = true;
+            handsFreeButton.classList.add("recording");
+            updateHandsFreeStatus("Listening for voice commands...");
+        }
+    );
+
+    handsFreeRecognition.addEventListener(
+        "result",
+        event => {
+            let transcript = "";
+
+            for (let index = 0; index < event.results.length; index += 1) {
+                transcript += event.results[index][0].transcript;
+            }
+
+            const command = transcript.trim();
+
+            if (!command) {
+                return;
+            }
+
+            updateHandsFreeStatus(
+                `Heard: ${command}`
+            );
+
+            const handled = executeHandsFreeCommand(command);
+
+            if (!handled) {
+                const fallback =
+                    "Command not recognised. Try open home, open services, increase text size, decrease text size, or turn on high contrast.";
+
+                updateHandsFreeStatus(fallback);
+                speakText(fallback);
+            }
+        }
+    );
+
+    handsFreeRecognition.addEventListener(
+        "end",
+        () => {
+            handsFreeButton.classList.remove("recording");
+
+            if (handsFreeModeActive) {
+                if (handsFreeListenTimer) {
+                    clearTimeout(handsFreeListenTimer);
+                }
+
+                handsFreeListenTimer = setTimeout(() => {
+                    if (!handsFreeModeActive || isAssistantSpeaking) {
+                        return;
+                    }
+
+                    resumeHandsFreeListening();
+                }, 350);
+            }
+        }
+    );
+
+    handsFreeRecognition.addEventListener(
+        "error",
+        event => {
+            if (
+                event.error !== "no-speech" &&
+                event.error !== "aborted"
+            ) {
+                console.warn(
+                    "Hands free recognition error:",
+                    event.error
+                );
+            }
+        }
+    );
+
+    handsFreeButton.addEventListener(
+        "click",
+        () => {
+            if (handsFreeModeActive) {
+                stopHandsFreeMode();
+                return;
+            }
+
+            handsFreeModeActive = true;
+            updateHandsFreeStatus("Hands free mode started. Say a command.");
+            speakText("Hands free mode started. Say a command.");
+        }
+    );
+
+    updateHandsFreeStatus("Hands free ready.");
+}
+
+
 async function fetchJson(url, options = {}) {
 
     const response = await fetch(url, options);
@@ -92,6 +1103,118 @@ async function fetchJson(url, options = {}) {
 /* =========================================================
    SCREEN NAVIGATION
 ========================================================= */
+
+function updateOcrStatus(message) {
+    const status = getById("ocr-status");
+
+    if (status) {
+        status.textContent = message;
+    }
+}
+
+
+function stopCamera() {
+    if (!cameraStream) return;
+
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+}
+
+
+async function readImageWithOcr(imageSource) {
+    if (!window.Tesseract || isOcrProcessing) return;
+
+    isOcrProcessing = true;
+    updateOcrStatus("Reading text...");
+
+    try {
+        const result = await Tesseract.recognize(
+            imageSource,
+            "eng",
+            {
+                logger: progress => {
+                    if (progress.status === "recognizing text") {
+                        updateOcrStatus(
+                            `Reading text... ${Math.round((progress.progress || 0) * 100)}%`
+                        );
+                    }
+                }
+            }
+        );
+
+        const text = result.data.text.trim();
+
+        if (!text) {
+            updateOcrStatus("No text found. Try again with better lighting.");
+            speakText("I could not find any text. Please try again with better lighting.");
+            return;
+        }
+
+        updateOcrStatus("Text read successfully.");
+        speakText(text);
+    } catch (error) {
+        console.error("OCR failed:", error);
+        updateOcrStatus("Could not read the image. Try again.");
+        speakText("I could not read that image. Please try again.");
+    } finally {
+        isOcrProcessing = false;
+    }
+}
+
+
+function captureCameraImage() {
+    const video = getById("camera-video");
+    const canvas = getById("camera-canvas");
+
+    if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        updateOcrStatus("Camera is not ready yet.");
+        return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    readImageWithOcr(canvas);
+}
+
+
+async function initialiseCamera() {
+    const video = getById("camera-video");
+
+    if (!video || cameraStream) return;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+        updateOcrStatus("Camera is not supported in this browser.");
+        return;
+    }
+
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+        });
+        video.srcObject = cameraStream;
+        updateOcrStatus("Camera ready. Focus on text and capture.");
+    } catch (error) {
+        console.error("Unable to open camera:", error);
+        updateOcrStatus("Camera permission is needed to read text.");
+    }
+}
+
+
+function initialiseCameraControls() {
+    const captureButton = getById("capture-btn");
+    const galleryButton = getById("gallery-btn");
+    const galleryInput = getById("gallery-input");
+
+    captureButton?.addEventListener("click", captureCameraImage);
+    galleryButton?.addEventListener("click", () => galleryInput?.click());
+    galleryInput?.addEventListener("change", event => {
+        const file = event.target.files?.[0];
+        if (file) readImageWithOcr(file);
+        event.target.value = "";
+    });
+}
 
 function showScreen(screenId) {
 
@@ -173,6 +1296,16 @@ function showScreen(screenId) {
         loadAllLocations();
     }
 
+    if (screenId === "locations-screen") {
+        requestCurrentLocation();
+    }
+
+    if (screenId === "camera-screen") {
+        initialiseCamera();
+    } else {
+        stopCamera();
+    }
+
 
     window.scrollTo({
         top: 0,
@@ -244,11 +1377,14 @@ async function loadServices() {
 
             card.dataset.serviceId =
                 service.id;
-
+            card.dataset.name =
+                service.name || "";
+            card.dataset.category =
+                service.category || "";
             card.dataset.search =
                 `${service.name || ""} ${
                     service.description || ""
-                }`.toLowerCase();
+                } ${service.category || ""}`.toLowerCase();
 
             card.innerHTML = `
                 <div class="service-icon">
@@ -292,6 +1428,7 @@ async function loadServices() {
         servicesList.dataset.loaded =
             "true";
 
+        applyServiceFilters();
         refreshIcons();
 
     } catch (error) {
@@ -320,6 +1457,19 @@ async function loadServices() {
 /* =========================================================
    LOAD LOCATIONS FOR A SERVICE
 ========================================================= */
+
+async function attachAccessibilityData(locations) {
+    const accessibilityRecords = await fetchJson(`${API_URL}/api/accessibility`);
+    const recordsById = new Map(
+        accessibilityRecords.map(record => [String(record.id), record])
+    );
+
+    // Location metadata and accessibility metadata are provided by separate APIs.
+    return locations.map(location => ({
+        ...location,
+        accessibility: recordsById.get(String(location.id)) || {}
+    }));
+}
 
 async function loadLocations(service) {
 
@@ -356,10 +1506,11 @@ async function loadLocations(service) {
 
     try {
 
-        const locations =
+        const locations = await attachAccessibilityData(
             await fetchJson(
                 `${API_URL}/api/services/${service.id}/locations`
-            );
+            )
+        );
 
         renderLocations(
             locations,
@@ -407,10 +1558,11 @@ async function loadAllLocations() {
 
     try {
 
-        const locations =
+        const locations = await attachAccessibilityData(
             await fetchJson(
                 `${API_URL}/api/locations`
-            );
+            )
+        );
 
         renderLocations(locations);
 
@@ -545,10 +1697,19 @@ function renderLocations(
         card.className =
             "location-card";
 
-        card.dataset.search =
-            `${location.name || ""} ${
-                location.address || ""
-            }`.toLowerCase();
+        const accessibility = location.accessibility || {};
+
+        // Keep card datasets aligned with the location and accessibility models.
+        card.dataset.name = location.name || "";
+        card.dataset.address = location.address || "";
+        card.dataset.city = location.city || "";
+        card.dataset.latitude = location.latitude ?? "";
+        card.dataset.longitude = location.longitude ?? "";
+        card.dataset.wheelchairAccessible = String(accessibility.wheelchairAccessible === true);
+        card.dataset.accessibleEntrance = String(accessibility.accessibleEntrance === true);
+        card.dataset.audioGuidance = String(accessibility.audioGuidance === true);
+        card.dataset.signLanguageSupport = String(accessibility.signLanguageSupport === true);
+        card.dataset.search = `${location.name || ""} ${location.address || ""} ${location.city || ""}`.toLowerCase();
 
         card.innerHTML = `
             <div class="location-icon">
@@ -567,6 +1728,10 @@ function renderLocations(
                         location.address ||
                         "Address unavailable"
                     )}
+                </p>
+
+                <p class="location-distance" hidden>
+                    Distance unavailable
                 </p>
             </div>
 
@@ -593,6 +1758,7 @@ function renderLocations(
 
 
     refreshIcons();
+    updateLocationCardDistances();
 }
 
 
@@ -1481,15 +2647,20 @@ function speakText(text) {
         return;
     }
 
+    if (handsFreeModeActive && handsFreeRecognition) {
+        try {
+            handsFreeRecognition.stop();
+        } catch (error) {
+            console.warn("Unable to pause hands free recognition:", error);
+        }
+    }
 
     window.speechSynthesis.cancel();
-
 
     const speech =
         new SpeechSynthesisUtterance(
             text
         );
-
 
     speech.lang =
         "en-ZA";
@@ -1500,39 +2671,43 @@ function speakText(text) {
     speech.pitch =
         1;
 
-
     speech.addEventListener(
         "start",
         () => {
-
-            isAssistantSpeaking =
-                true;
-
+            isAssistantSpeaking = true;
+            updateHandsFreeStatus("Assistant speaking...");
         }
     );
-
 
     speech.addEventListener(
         "end",
         () => {
+            isAssistantSpeaking = false;
 
-            isAssistantSpeaking =
-                false;
+            if (handsFreeModeActive && !voiceOutputEnabled) {
+                return;
+            }
 
+            if (handsFreeModeActive) {
+                setTimeout(() => {
+                    resumeHandsFreeListening();
+                }, 300);
+            }
         }
     );
-
 
     speech.addEventListener(
         "error",
         () => {
+            isAssistantSpeaking = false;
 
-            isAssistantSpeaking =
-                false;
-
+            if (handsFreeModeActive) {
+                setTimeout(() => {
+                    resumeHandsFreeListening();
+                }, 300);
+            }
         }
     );
-
 
     window.speechSynthesis.speak(
         speech
@@ -1558,30 +2733,7 @@ function initialiseSearch() {
         serviceSearch.addEventListener(
             "input",
             event => {
-
-                const query =
-                    event.target.value
-                        .toLowerCase()
-                        .trim();
-
-
-                document
-                    .querySelectorAll(
-                        "#services-list .service-card"
-                    )
-                    .forEach(card => {
-
-                        const matches =
-                            card.dataset.search
-                                .includes(query);
-
-                        card.style.display =
-                            matches
-                                ? ""
-                                : "none";
-
-                    });
-
+                applyServiceFilters();
             }
         );
     }
@@ -1630,7 +2782,7 @@ function initialiseFilterChips() {
 
     document
         .querySelectorAll(
-            ".filter-chip"
+            "#service-filter-chips .filter-chip"
         )
         .forEach(chip => {
 
@@ -1641,34 +2793,131 @@ function initialiseFilterChips() {
                     const container =
                         chip.parentElement;
 
+                    container
+                        ?.querySelectorAll(
+                            ".filter-chip"
+                        )
+                        .forEach(item => {
+                            item.classList.remove("active");
+                        });
+
+                    chip.classList.add("active");
+                    applyServiceFilters();
+                }
+            );
+
+        });
+
+    document
+        .querySelectorAll(
+            "#location-filter-chips .filter-chip"
+        )
+        .forEach(chip => {
+
+            chip.addEventListener(
+                "click",
+                () => {
+
+                    const container =
+                        chip.parentElement;
 
                     container
                         ?.querySelectorAll(
                             ".filter-chip"
                         )
                         .forEach(item => {
-
-                            item.classList.remove(
-                                "active"
-                            );
-
+                            item.classList.remove("active");
                         });
 
-
-                    chip.classList.add(
-                        "active"
-                    );
-
+                    chip.classList.add("active");
+                    applyLocationFilters();
                 }
             );
 
         });
+
+    applyServiceFilters();
+    applyLocationFilters();
 }
 
 
 /* =========================================================
    PREFERENCE CONTROLS
 ========================================================= */
+
+function applyLanguagePreference(languageCode = appLanguage) {
+    const language = String(languageCode || "en").toLowerCase();
+    appLanguage = language;
+
+    document.documentElement.lang = language;
+
+    if (handsFreeRecognition) {
+        handsFreeRecognition.lang =
+            language === "af" ? "af-ZA" :
+            language === "zu" ? "zu-ZA" :
+            language === "xh" ? "xh-ZA" :
+            language === "nso" ? "n-ZA" :
+            language === "tn" ? "en-ZA" :
+            "en-ZA";
+    }
+
+    const speechLanguage =
+        language === "af" ? "af-ZA" :
+        language === "zu" ? "zu-ZA" :
+        language === "xh" ? "xh-ZA" :
+        language === "nso" ? "n-ZA" :
+        language === "tn" ? "en-ZA" :
+        "en-ZA";
+
+    const status = `Language set to ${language.toUpperCase()}.`;
+    updateHandsFreeStatus(status);
+
+    if (voiceOutputEnabled) {
+        speakText(status);
+    }
+}
+
+
+function applyAccessibilityPreference(chip) {
+    if (!chip) return;
+
+    const chipText = chip.textContent.toLowerCase();
+
+    if (chipText.includes("low vision")) {
+        setHighContrastMode(true);
+        changeTextSize(2);
+        return;
+    }
+
+    if (chipText.includes("blind")) {
+        setHighContrastMode(true);
+        voiceOutputEnabled = true;
+        const toggle = document.querySelector(".toggle.active");
+        if (toggle) {
+            toggle.classList.add("active");
+        }
+        speakText("Blind mode enabled.");
+        return;
+    }
+
+    if (chipText.includes("deaf")) {
+        voiceOutputEnabled = false;
+        const status = "Voice responses turned off for deaf mode.";
+        updateHandsFreeStatus(status);
+        return;
+    }
+
+    if (chipText.includes("mobility")) {
+        mobilityPreferenceEnabled = true;
+        showScreen("locations-screen");
+        setLocationFilterByName("all");
+        applyLocationFilters();
+        const status = "Mobility mode opened with wheelchair-friendly locations.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+    }
+}
+
 
 function initialisePreferences() {
 
@@ -1690,6 +2939,12 @@ function initialisePreferences() {
                         "selected"
                     );
 
+                    if (chip.classList.contains("selected")) {
+                        applyAccessibilityPreference(chip);
+                    } else if (chip.textContent.toLowerCase().includes("mobility")) {
+                        mobilityPreferenceEnabled = false;
+                        applyLocationFilters();
+                    }
                 }
             );
 
@@ -1700,9 +2955,34 @@ function initialisePreferences() {
         Custom toggle buttons
     */
 
+    const contrastToggle = getById("high-contrast-toggle");
+
+    const readAloudToggle = getById("read-aloud-toggle");
+
+    if (readAloudToggle) {
+        readAloudToggle.addEventListener("click", () => {
+            setReadAloudMode(!readAloudEnabled);
+            if (readAloudEnabled) {
+                speakText("Read aloud enabled.");
+            }
+        });
+    }
+
+    if (contrastToggle) {
+        const contrastEnabled = document.body.classList.contains("high-contrast-mode");
+        contrastToggle.classList.toggle("active", contrastEnabled);
+        contrastToggle.setAttribute("aria-pressed", String(contrastEnabled));
+
+        contrastToggle.addEventListener("click", () => {
+            setHighContrastMode(
+                !document.body.classList.contains("high-contrast-mode")
+            );
+        });
+    }
+
     document
         .querySelectorAll(
-            ".toggle"
+            ".toggle:not(#high-contrast-toggle):not(#read-aloud-toggle)"
         )
         .forEach(toggle => {
 
@@ -1714,12 +2994,6 @@ function initialisePreferences() {
                         "active"
                     );
 
-
-                    /*
-                        First communication toggle
-                        controls voice output.
-                    */
-
                     const settingText =
                         toggle
                             .closest(
@@ -1728,23 +3002,42 @@ function initialisePreferences() {
                             ?.innerText
                             ?.toLowerCase();
 
-
                     if (
                         settingText?.includes(
                             "voice responses"
                         )
                     ) {
+                        voiceOutputEnabled = toggle.classList.contains("active");
+                        if (!voiceOutputEnabled) {
+                            setReadAloudMode(false);
+                        }
+                        const status = voiceOutputEnabled
+                            ? "Voice responses enabled."
+                            : "Voice responses disabled.";
+                        updateHandsFreeStatus(status);
 
-                        voiceOutputEnabled =
-                            toggle.classList.contains(
-                                "active"
-                            );
+                        if (voiceOutputEnabled) {
+                            speakText(status);
+                        }
                     }
-
                 }
             );
 
         });
+
+
+    /*
+        Language select
+    */
+
+    const languageSelect = getById("language-select");
+
+    if (languageSelect) {
+        languageSelect.addEventListener("change", event => {
+            const selectedLanguage = event.target.value || "en";
+            applyLanguagePreference(selectedLanguage);
+        });
+    }
 
 
     /*
@@ -1901,6 +3194,26 @@ function initialiseLocationBackButton() {
 }
 
 
+function initialiseEmergencyHelp() {
+    const emergencyButton = getById("emergency-help-btn");
+
+    if (!emergencyButton) return;
+
+    emergencyButton.addEventListener("click", () => {
+        const message = "South African emergency numbers: 112 from a mobile phone, 10111 for police, and 10177 for ambulance services.";
+        updateHandsFreeStatus(message);
+
+        if (voiceOutputEnabled) {
+            speakText(message);
+        }
+
+        if (window.confirm(`${message}\n\nCall 112 now?`)) {
+            window.location.href = "tel:112";
+        }
+    });
+}
+
+
 /* =========================================================
    APP INITIALISATION
 ========================================================= */
@@ -1913,6 +3226,8 @@ document.addEventListener(
 
         initialiseSpeechRecognition();
 
+        initialiseHandsFreeControls();
+
         initialiseSearch();
 
         initialiseFilterChips();
@@ -1922,6 +3237,14 @@ document.addEventListener(
         initialiseChatSuggestions();
 
         initialiseLocationBackButton();
+
+        initialiseEmergencyHelp();
+
+        initialiseCameraControls();
+
+        document.addEventListener("click", event => {
+            speakButtonLabel(event.target.closest("button"));
+        }, true);
 
         refreshIcons();
 

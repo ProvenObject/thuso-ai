@@ -124,7 +124,32 @@ app.get("/api/accessibility/:id", (req, res) => {
 
 // Get all government services
 app.get("/api/services", (req, res) => {
-    res.json(servicesData.services);
+    const { category, name } = req.query;
+
+    let filteredServices = [...servicesData.services];
+
+    if (category) {
+        const normalizedCategory = String(category).trim().toLowerCase();
+
+        filteredServices = filteredServices.filter(service => {
+            const serviceName = (service.name || "").toLowerCase();
+            const serviceCategory = (service.category || "").toLowerCase();
+
+            return serviceName === normalizedCategory ||
+                serviceCategory.includes(normalizedCategory) ||
+                serviceName.includes(normalizedCategory);
+        });
+    }
+
+    if (name) {
+        const normalizedName = String(name).trim().toLowerCase();
+
+        filteredServices = filteredServices.filter(service =>
+            (service.name || "").toLowerCase().includes(normalizedName)
+        );
+    }
+
+    res.json(filteredServices);
 });
 
 // Get all locations for a specific service
