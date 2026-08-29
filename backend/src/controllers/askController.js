@@ -4,18 +4,28 @@ const {
   detectService,
   detectAccessibilityNeed,
   detectCity,
+  detectUserGoal,
+  isDocumentRequirementQuestion,
   buildServiceLocations,
   buildResponseText,
+  buildDocumentRequirementsResponse,
   serviceByName,
 } = require("../services/locationService");
 
 const conversationStateById = new Map();
 
+// In-memory only: no database, no auth, no sensitive personal data.
+// Tracks just enough about the current task to make follow-up messages coherent.
 function createConversationState() {
   return {
     service: null,
-    accessibilityNeed: null,
     city: null,
+    accessibilityNeed: null,
+    selectedLocation: null,
+    userGoal: null,
+    lastIntent: null,
+    lastResponse: null,
+    pendingQuestion: null,
   };
 }
 
@@ -43,7 +53,7 @@ function getConversationState(conversationId) {
 //   conversationId: "...",
 //   service: null | { id, name },
 //   locations: [],
-//   conversation: { conversationId, service, accessibilityNeed, city },
+//   conversation: { conversationId, service, city, accessibilityNeed, selectedLocation, userGoal, lastIntent, lastResponse, pendingQuestion },
 //   action: null
 // }
 function buildAskResponse({ response, conversationId, state, service, locations, action = null }) {
@@ -59,8 +69,13 @@ function buildAskResponse({ response, conversationId, state, service, locations,
     conversation: {
       conversationId,
       service: state?.service || null,
-      accessibilityNeed: state?.accessibilityNeed || null,
       city: state?.city || null,
+      accessibilityNeed: state?.accessibilityNeed || null,
+      selectedLocation: state?.selectedLocation || null,
+      userGoal: state?.userGoal || null,
+      lastIntent: state?.lastIntent || null,
+      lastResponse: state?.lastResponse || null,
+      pendingQuestion: state?.pendingQuestion || null,
     },
     action: action || null,
   };
@@ -84,16 +99,15 @@ async function ask(req, res) {
     );
   }
 
-  let service = null;
-  let accessibilityNeed = null;
-  let city = null;
-
   const aiIntent = await getAiIntent(rawMessage);
   console.log("AI Intent:", aiIntent);
 
-  service = detectService(message, aiIntent) || (state.service ? serviceByName(state.service) : null);
-  accessibilityNeed = detectAccessibilityNeed(message, aiIntent) || state.accessibilityNeed || null;
-  city = detectCity(message, aiIntent) || state.city || null;
+  const detectedService = detectService(message, aiIntent);
+  const serviceChanged = Boolean(detectedService) && state.service !== detectedService.name;
+
+  const service = detectedService || (state.service ? serviceByName(state.service) : null);
+  const accessibilityNeed = detectAccessibilityNeed(message, aiIntent) || state.accessibilityNeed || null;
+  const city = detectCity(message, aiIntent) || state.city || null;
 
   if (service) {
     state.service = service.name;
@@ -107,7 +121,19 @@ async function ask(req, res) {
     state.city = city;
   }
 
-  console.log("Conversation state:", { conversationId, state });
+  // A new service means the previous selection/goal no longer applies.
+  if (serviceChanged) {
+    state.selectedLocation = null;
+    state.userGoal = null;
+  }
+
+  const detectedUserGoal = detectUserGoal(message, service);
+
+  if (detectedUserGoal) {
+    state.userGoal = detectedUserGoal;
+  }
+
+  const isFollowUpDocumentQuestion = isDocumentRequirementQuestion(message);
 
   let locations = [];
 
@@ -115,7 +141,25 @@ async function ask(req, res) {
     locations = buildServiceLocations(service, state.city, state.accessibilityNeed);
   }
 
-  const response = buildResponseText(service, locations, state.city, state.accessibilityNeed);
+  if (locations.length === 1) {
+    const onlyMatch = locations[0];
+    state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
+  }
+
+  const response = isFollowUpDocumentQuestion
+    ? buildDocumentRequirementsResponse(service, state.userGoal)
+    : buildResponseText(service, locations, state.city, state.accessibilityNeed);
+
+  state.pendingQuestion = /\?\s*$/.test(response) ? response : null;
+  state.lastIntent = {
+    service: service ? service.name : null,
+    accessibilityNeed,
+    city,
+    userGoal: state.userGoal,
+  };
+  state.lastResponse = response;
+
+  console.log("Conversation state:", { conversationId, state });
 
   return res.json(
     buildAskResponse({

@@ -213,11 +213,70 @@ const buildResponseText = (service, locations, city, accessibilityNeed) => {
   return `I can help with ${service.name}. Which town are you in?`;
 };
 
+const goalsByService = {
+  "Home Affairs": [
+    { keywords: ["passport"], goal: "applying for or renewing a passport" },
+    { keywords: ["birth certificate"], goal: "obtaining a birth certificate" },
+    { keywords: ["marriage certificate"], goal: "obtaining a marriage certificate" },
+    { keywords: ["id", "identity"], goal: "obtaining or replacing an identity document" },
+  ],
+  SASSA: [
+    { keywords: ["grant", "sassa", "social grant"], goal: "applying for or managing a social grant" },
+  ],
+  "Department of Health": [
+    { keywords: ["clinic", "hospital", "doctor", "medicine", "sick", "ill", "medical"], goal: "accessing healthcare services" },
+  ],
+  "Municipal Services": [
+    { keywords: ["rates", "water", "electricity", "refuse", "municipal", "municipality"], goal: "resolving a municipal services matter" },
+  ],
+  Education: [
+    { keywords: ["bursary", "school", "university", "college", "education"], goal: "accessing education or bursary support" },
+  ],
+};
+
+// Infers a plain-language goal only from keywords already present in the current message.
+const detectUserGoal = (message, service) => {
+  if (!service) {
+    return null;
+  }
+
+  const candidates = goalsByService[service.name];
+
+  if (!candidates) {
+    return null;
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.keywords.some((keyword) => message.includes(keyword))) {
+      return candidate.goal;
+    }
+  }
+
+  return null;
+};
+
+const isDocumentRequirementQuestion = (message) =>
+  /document|paperwork|requirement|what.*(do i|does it|would i).*need|need to bring/i.test(message);
+
+// We only have location data, not document checklists, so we say so honestly instead of guessing.
+const buildDocumentRequirementsResponse = (service, userGoal) => {
+  if (!service) {
+    return "I'm not sure which service you mean, so I can't say what documents are needed. Could you tell me which service this is for?";
+  }
+
+  const goalText = userGoal ? ` for ${userGoal}` : "";
+
+  return `I don't have detailed document requirement information for ${service.name}${goalText} in my current data. I'd recommend confirming the exact requirements with your nearest ${service.name} office.`;
+};
+
 module.exports = {
   detectService,
   detectAccessibilityNeed,
   detectCity,
+  detectUserGoal,
+  isDocumentRequirementQuestion,
   buildServiceLocations,
   buildResponseText,
+  buildDocumentRequirementsResponse,
   serviceByName,
 };
