@@ -158,6 +158,12 @@ async function ask(req, res) {
     state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
   }
 
+  // A single location for the stated city is confident enough to treat as "the" facility being asked about.
+  const cityMatches = city
+    ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
+    : [];
+  const hasConfidentLocationMatch = cityMatches.length === 1 || locations.length === 1;
+
   const hasContext = Boolean(state.service || state.city || state.accessibilityNeed);
   const intent = aiIntent?.intent || detectIntent(message, {
     hasService: Boolean(service),
@@ -166,6 +172,7 @@ async function ask(req, res) {
     locationReference,
     isDocumentQuestion: isFollowUpDocumentQuestion,
     hasContext,
+    hasConfidentLocationMatch,
   });
 
   const hasLocations = locations.length > 0 || Boolean(state.selectedLocation);
@@ -201,6 +208,19 @@ async function ask(req, res) {
   };
   state.lastResponse = response;
 
+  const action = determineUiAction({
+    intent,
+    message,
+    service,
+    city,
+    accessibilityNeed,
+    locations,
+    cityMatches,
+    state,
+    locationReference,
+    needsClarification: clarification.needsClarification,
+  });
+
   console.log("Conversation state:", { conversationId, state });
 
   return res.json(
@@ -210,8 +230,94 @@ async function ask(req, res) {
       state,
       service,
       locations,
+      action,
     })
   );
+}
+
+// Maps the resolved intent onto the limited set of actions the current frontend can
+// actually perform (see navigation.js/locations.js/preferences.js). Never guesses a
+// target the data can't confidently support.
+function determineUiAction({ intent, message, service, city, accessibilityNeed, locations, cityMatches, state, locationReference, needsClarification }) {
+  if (needsClarification) {
+    return { type: "none" };
+  }
+
+  if (intent === "directions") {
+    if (state.selectedLocation) {
+      return {
+        type: "open_directions",
+        locationId: state.selectedLocation.id,
+        locationName: state.selectedLocation.name,
+      };
+    }
+
+    return { type: "none" };
+  }
+
+  if (intent === "facility_details") {
+    const confidentMatch = cityMatches.length === 1
+      ? cityMatches[0]
+      : (locations.length === 1 ? locations[0] : null);
+
+    if (confidentMatch) {
+      return {
+        type: "show_location_details",
+        locationId: confidentMatch.id,
+        locationName: confidentMatch.name,
+      };
+    }
+
+    return { type: "none" };
+  }
+
+  if (intent === "nearby_facilities" && locationReference === "selection" && state.selectedLocation) {
+    return {
+      type: "show_location_details",
+      locationId: state.selectedLocation.id,
+      locationName: state.selectedLocation.name,
+    };
+  }
+
+  if (intent === "accessibility_question" && service) {
+    return {
+      type: "filter_locations",
+      serviceId: service.id,
+      accessibilityNeed: accessibilityNeed || null,
+    };
+  }
+
+  if (intent === "ui_command") {
+    if (/preference|accessibility setting/.test(message)) {
+      return { type: "show_preferences" };
+    }
+
+    if (/home screen|go home|start over|main menu/.test(message)) {
+      return { type: "show_home" };
+    }
+
+    if (/service/.test(message)) {
+      return { type: "show_services" };
+    }
+
+    return { type: "none" };
+  }
+
+  if (service && locations.length > 0 && ["find_service", "find_facility", "follow_up_question", "service_information"].includes(intent)) {
+    return {
+      type: "show_locations",
+      serviceId: service.id,
+      serviceName: service.name,
+      city: city || null,
+      accessibilityNeed: accessibilityNeed || null,
+    };
+  }
+
+  if (intent === "general_help" && !service) {
+    return { type: "show_services" };
+  }
+
+  return { type: "none" };
 }
 
 async function testGemini(req, res) {

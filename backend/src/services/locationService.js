@@ -7,6 +7,12 @@ const detectService = (message, aiIntent) => {
     return serviceByName(aiIntent.service);
   }
 
+  const namedService = servicesData.services.find((service) => message.includes(service.name.toLowerCase()));
+
+  if (namedService) {
+    return namedService;
+  }
+
   if (
     message.includes("id") ||
     message.includes("identity") ||
@@ -286,11 +292,11 @@ const detectLocationReference = (message) => {
 };
 
 const UI_COMMAND_PATTERN = /\b(open|enable|turn on|turn off|zoom in|zoom out|show me the map|start voice|open camera)\b/i;
-const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get)\b/i;
+const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get|take me there|take me to)\b/i;
 const FACILITY_DETAILS_PATTERN = /\b(opening hours|open until|contact number|phone number|address of|what time)\b/i;
 
 // Deterministic fallback used when Gemini is unavailable or doesn't return an intent.
-const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext }) => {
+const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext, hasConfidentLocationMatch }) => {
   if (isDocumentQuestion) {
     return "service_information";
   }
@@ -303,7 +309,7 @@ const detectIntent = (message, { hasService, isNewService, accessibilityNeed, lo
     return "directions";
   }
 
-  if (FACILITY_DETAILS_PATTERN.test(message)) {
+  if (FACILITY_DETAILS_PATTERN.test(message) || hasConfidentLocationMatch) {
     return "facility_details";
   }
 
