@@ -6,20 +6,82 @@ const {
   detectCity,
   buildServiceLocations,
   buildResponseText,
+  serviceByName,
 } = require("../services/locationService");
 
-const conversationState = {
-  service: null,
-  accessibilityNeed: null,
-  city: null,
-};
+const conversationStateById = new Map();
+
+function createConversationState() {
+  return {
+    service: null,
+    accessibilityNeed: null,
+    city: null,
+  };
+}
+
+function getConversationState(conversationId) {
+  const id = conversationId && String(conversationId).trim();
+
+  if (!id) {
+    const generatedId = `conversation-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const state = createConversationState();
+    conversationStateById.set(generatedId, state);
+    return { conversationId: generatedId, state };
+  }
+
+  if (!conversationStateById.has(id)) {
+    conversationStateById.set(id, createConversationState());
+  }
+
+  return { conversationId: id, state: conversationStateById.get(id) };
+}
+
+// Standard ask response contract used by the frontend and future conversational flows.
+// Always returned shape:
+// {
+//   response: "...",
+//   conversationId: "...",
+//   service: null | { id, name },
+//   locations: [],
+//   conversation: { conversationId, service, accessibilityNeed, city },
+//   action: null
+// }
+function buildAskResponse({ response, conversationId, state, service, locations, action = null }) {
+  const normalizedService = service && service.id && service.name
+    ? { id: service.id, name: service.name }
+    : null;
+
+  return {
+    response: response || "",
+    conversationId,
+    service: normalizedService,
+    locations: Array.isArray(locations) ? locations : [],
+    conversation: {
+      conversationId,
+      service: state?.service || null,
+      accessibilityNeed: state?.accessibilityNeed || null,
+      city: state?.city || null,
+    },
+    action: action || null,
+  };
+}
 
 async function ask(req, res) {
-  const rawMessage = req.body.message?.trim() || "";
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const rawMessage = (body.message || "").trim();
   const message = rawMessage.toLowerCase();
+  const { conversationId, state } = getConversationState(body.conversationId);
 
   if (!message) {
-    return res.status(400).json({ response: "Please enter a question." });
+    return res.status(400).json(
+      buildAskResponse({
+        response: "Please enter a question.",
+        conversationId,
+        state,
+        service: null,
+        locations: [],
+      })
+    );
   }
 
   let service = null;
@@ -29,49 +91,41 @@ async function ask(req, res) {
   const aiIntent = await getAiIntent(rawMessage);
   console.log("AI Intent:", aiIntent);
 
-  service = detectService(message, aiIntent);
-  accessibilityNeed = detectAccessibilityNeed(message, aiIntent);
-  city = detectCity(message, aiIntent);
-
-  if (!service && conversationState.service) {
-    service = servicesData.services.find((item) => item.name === conversationState.service) || null;
-  }
-
-  if (!accessibilityNeed && conversationState.accessibilityNeed) {
-    accessibilityNeed = conversationState.accessibilityNeed;
-  }
-
-  if (!city && conversationState.city) {
-    city = conversationState.city;
-  }
+  service = detectService(message, aiIntent) || (state.service ? serviceByName(state.service) : null);
+  accessibilityNeed = detectAccessibilityNeed(message, aiIntent) || state.accessibilityNeed || null;
+  city = detectCity(message, aiIntent) || state.city || null;
 
   if (service) {
-    conversationState.service = service.name;
+    state.service = service.name;
   }
 
   if (accessibilityNeed) {
-    conversationState.accessibilityNeed = accessibilityNeed;
+    state.accessibilityNeed = accessibilityNeed;
   }
 
   if (city) {
-    conversationState.city = city;
+    state.city = city;
   }
 
-  console.log("Conversation state:", conversationState);
+  console.log("Conversation state:", { conversationId, state });
 
   let locations = [];
 
   if (service) {
-    locations = buildServiceLocations(service, city, accessibilityNeed);
+    locations = buildServiceLocations(service, state.city, state.accessibilityNeed);
   }
 
-  const response = buildResponseText(service, locations, city, accessibilityNeed);
+  const response = buildResponseText(service, locations, state.city, state.accessibilityNeed);
 
-  return res.json({
-    response,
-    service: service ? { id: service.id, name: service.name } : null,
-    locations,
-  });
+  return res.json(
+    buildAskResponse({
+      response,
+      conversationId,
+      state,
+      service,
+      locations,
+    })
+  );
 }
 
 async function testGemini(req, res) {
@@ -97,5 +151,5 @@ async function testGemini(req, res) {
 module.exports = {
   ask,
   testGemini,
-  conversationState,
+  conversationStateById,
 };

@@ -217,6 +217,7 @@ function renderLocationDetails(location, accessibility) {
   if (!details) return;
 
   const image = location.image || location.imageUrl || "";
+  const hasCoordinates = Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude));
 
   details.innerHTML = `
     ${image ? `
@@ -240,6 +241,12 @@ function renderLocationDetails(location, accessibility) {
         <p class="location-description">${escapeHtml(location.description)}</p>
       ` : ""}
 
+      ${hasCoordinates ? `
+        <section class="map-section">
+          <div id="location-map" class="map-container"></div>
+        </section>
+      ` : ""}
+
       <section class="accessibility-section">
         <div class="section-heading">
           <h2>Accessibility</h2>
@@ -256,7 +263,7 @@ function renderLocationDetails(location, accessibility) {
 
       <button id="directions-btn" class="primary-btn directions-btn" type="button">
         ${createIcon("navigation")}
-        Get Directions
+        Start
       </button>
     </div>
   `;
@@ -266,7 +273,48 @@ function renderLocationDetails(location, accessibility) {
     directionsButton.addEventListener("click", openDirections);
   }
 
+  if (hasCoordinates) {
+    initialiseLeafletMap(location);
+  }
+
   refreshIcons();
+}
+
+function initialiseLeafletMap(location) {
+  if (!window.L || !location || !Number.isFinite(Number(location.latitude)) || !Number.isFinite(Number(location.longitude))) {
+    return;
+  }
+
+  const mapElement = document.getElementById("location-map");
+  if (!mapElement) {
+    return;
+  }
+
+  if (mapElement._leaflet_id) {
+    return;
+  }
+
+  const lat = Number(location.latitude);
+  const lng = Number(location.longitude);
+
+  const map = L.map("location-map", {
+    zoomControl: true,
+    scrollWheelZoom: true,
+    attributionControl: true,
+  }).setView([lat, lng], 14);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(map);
+
+  const marker = L.marker([lat, lng]).addTo(map);
+  marker.bindPopup(`<strong>${escapeHtml(location.name || "Location")}</strong><br>${escapeHtml(location.address || "Address unavailable")}`);
+  marker.openPopup();
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
 }
 
 function openDirections() {

@@ -178,42 +178,39 @@ const buildResponseText = (service, locations, city, accessibilityNeed) => {
     return "I'm not sure which government service can help with that. Try telling me what you need help with, for example an ID, grant, doctor, municipality, school or bursary.";
   }
 
-  let response = `It sounds like you may need help from ${service.name}. ${service.description}`;
+  const accessibilityLabels = {
+    wheelchairAccessible: "wheelchair access",
+    audioGuidance: "audio guidance",
+    signLanguageSupport: "sign language support",
+    accessibleEntrance: "an accessible entrance",
+  };
 
-  if (city) {
-    const cityLocations = locations.filter(
-      (location) => location.city && location.city.toLowerCase() === city.toLowerCase()
-    );
+  const matchingLocations = locations.filter((location) => location.accessibilityMatch);
 
-    if (cityLocations.length > 0) {
-      response += ` I found ${cityLocations.length} location${cityLocations.length === 1 ? "" : "s"} in ${city}.`;
-    } else {
-      response += ` I couldn't find a location specifically in ${city}, so I've shown the closest available options first.`;
+  if (city && !accessibilityNeed) {
+    const cityLocationCount = locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase()).length;
+
+    if (cityLocationCount > 0) {
+      return `I found ${service.name} options in ${city}. ${matchingLocations.length > 0 ? `I’ve highlighted ${matchingLocations.length} accessible option${matchingLocations.length === 1 ? "" : "s"}.` : "Are you looking for wheelchair accessibility?"}`;
     }
+
+    return `I found ${service.name} options nearby, but not specifically in ${city}. I can narrow the search by accessibility or look for the nearest matching office.`;
   }
 
   if (accessibilityNeed) {
-    const accessibilityLabels = {
-      wheelchairAccessible: "wheelchair access",
-      audioGuidance: "audio guidance",
-      signLanguageSupport: "sign language support",
-      accessibleEntrance: "an accessible entrance",
-    };
-
-    const matchingLocations = locations.filter((location) => location.accessibilityMatch);
-
     if (matchingLocations.length > 0) {
-      response += ` I prioritized ${matchingLocations.length} location${matchingLocations.length === 1 ? "" : "s"} with ${accessibilityLabels[accessibilityNeed]}.`;
-    } else {
-      response += ` I couldn't verify ${accessibilityLabels[accessibilityNeed]} for the locations in the current data.`;
+      const targetText = accessibilityLabels[accessibilityNeed] || "accessibility support";
+      return `I found ${matchingLocations.length} ${service.name} location${matchingLocations.length === 1 ? "" : "s"}${city ? ` in ${city}` : ""} with ${targetText}.`;
     }
+
+    return `I found ${service.name} options${city ? ` in ${city}` : ""}, but I couldn’t confirm ${accessibilityLabels[accessibilityNeed] || "that accessibility need"} in the current list.`;
   }
 
-  if (locations.length > 0 && !city && !accessibilityNeed) {
-    response += ` I found ${locations.length} location${locations.length === 1 ? "" : "s"} for this service.`;
+  if (city) {
+    return `I found ${service.name} options in ${city}. Are you looking for wheelchair accessibility?`;
   }
 
-  return response;
+  return `I can help with ${service.name}. Which town are you in?`;
 };
 
 module.exports = {

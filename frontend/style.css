@@ -899,6 +899,40 @@ body.high-contrast-mode .location-card .location-distance {
     padding: 0 20px;
 }
 
+.map-section {
+    margin: 20px 0 8px;
+    padding: 0;
+}
+
+.map-container {
+    width: 100%;
+    height: 300px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #e7efe9;
+    box-shadow: 0 3px 10px rgba(15, 92, 77, 0.08);
+}
+
+.map-container #location-map,
+.map-container .leaflet-container {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 16px;
+}
+
+.leaflet-control-zoom {
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+    color: var(--primary) !important;
+    font-weight: 700;
+}
+
 
 /*
  Accessibility sections

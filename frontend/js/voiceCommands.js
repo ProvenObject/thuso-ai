@@ -252,59 +252,6 @@ function executeHandsFreeCommand(rawCommand) {
 
   if (
     matchesAny([
-      "show home affairs",
-      "open home affairs",
-      "home affairs",
-      "find home affairs",
-      "home affairs office"
-    ])
-  ) {
-    showScreen("services-screen");
-    setServiceFilterByName("home affairs");
-    const status = "Opening Home Affairs services.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show sassa",
-      "open sassa",
-      "sassa",
-      "find sassa",
-      "social grant office"
-    ])
-  ) {
-    showScreen("services-screen");
-    setServiceFilterByName("sassa");
-    const status = "Opening SASSA services.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show health",
-      "open health",
-      "department of health",
-      "health services",
-      "find clinic",
-      "find hospital",
-      "medical help"
-    ])
-  ) {
-    showScreen("services-screen");
-    setServiceFilterByName("health");
-    const status = "Opening health services.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
       "open services",
       "show services",
       "find service",
@@ -333,126 +280,6 @@ function executeHandsFreeCommand(rawCommand) {
   ) {
     showScreen("locations-screen");
     const status = "Opening accessible locations.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show wheelchair",
-      "wheelchair accessible",
-      "show wheelchair accessible",
-      "find wheelchair friendly place",
-      "find wheelchair access",
-      "look for wheelchair"
-    ])
-  ) {
-    showScreen("locations-screen");
-    setLocationFilterByName("wheelchairAccessible");
-    const status = "Showing wheelchair accessible locations.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show ramp access",
-      "ramp accessible",
-      "step free places",
-      "level access",
-      "show step free locations"
-    ])
-  ) {
-    showScreen("locations-screen");
-    setLocationFilterByName("accessibleEntrance");
-    const status = "Showing step-free and ramp-accessible locations.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show elevator",
-      "lift access",
-      "elevator access",
-      "find lift places"
-    ])
-  ) {
-    showScreen("locations-screen");
-    setLocationFilterByName("accessibleEntrance");
-    const status = "Showing elevator-accessible locations.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show audio guidance",
-      "audio guidance locations",
-      "voice guided places",
-      "audio assisted locations"
-    ])
-  ) {
-    showScreen("locations-screen");
-    setLocationFilterByName("audioGuidance");
-    const status = "Showing locations with audio guidance.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "show sign language",
-      "sign language support",
-      "deaf accessible",
-      "hearing friendly places"
-    ])
-  ) {
-    showScreen("locations-screen");
-    setLocationFilterByName("signLanguageSupport");
-    const status = "Showing locations with sign language support.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  const city = getCityFromVoiceCommand(command);
-  const service = getServiceFromVoiceCommand(command);
-  const accessibility = getAccessibilityFilterFromVoiceCommand(command);
-
-  if (service || city || accessibility !== "all") {
-    showScreen("locations-screen");
-
-    if (service) {
-      setServiceFilterByName(service);
-    }
-
-    if (accessibility !== "all") {
-      const mappedFilter = accessibility === "audio" ? "audio" : accessibility === "sign" ? "sign" : accessibility === "entrance" ? "all" : accessibility;
-      if (mappedFilter !== "all") {
-        setLocationFilterByName(mappedFilter);
-      }
-    }
-
-    if (city) {
-      const locationSearch = document.getElementById("location-search");
-      if (locationSearch) {
-        locationSearch.value = city;
-      }
-      applyLocationFilters();
-    }
-
-    const status = service
-      ? `Showing ${service} locations${city ? ` in ${city}` : ""}.`
-      : city
-        ? `Showing locations in ${city}.`
-        : "Showing accessible locations.";
-
     updateHandsFreeStatus(status);
     speakText(status);
     return true;
@@ -545,11 +372,16 @@ function executeHandsFreeCommand(rawCommand) {
       "show commands"
     ])
   ) {
-    const status =
-      "Try open home, open services, open chat, find home affairs, show wheelchair accessible places, increase text size, decrease text size, or turn on high contrast.";
+    const status = "Try open home, open services, open chat, turn on high contrast, increase text size, or ask a question like I need Home Affairs in Polokwane.";
 
     updateHandsFreeStatus(status);
     speakText(status);
+    return true;
+  }
+
+  if (typeof sendChatMessage === "function") {
+    updateHandsFreeStatus("Sending your request to Thušo...");
+    sendChatMessage(command);
     return true;
   }
 
