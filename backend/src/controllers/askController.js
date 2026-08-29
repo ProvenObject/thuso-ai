@@ -6,9 +6,13 @@ const {
   detectCity,
   detectUserGoal,
   isDocumentRequirementQuestion,
+  detectLocationReference,
+  detectIntent,
+  detectClarification,
   buildServiceLocations,
   buildResponseText,
   buildDocumentRequirementsResponse,
+  buildNearbyFacilitiesResponse,
   serviceByName,
 } = require("../services/locationService");
 
@@ -99,7 +103,14 @@ async function ask(req, res) {
     );
   }
 
-  const aiIntent = await getAiIntent(rawMessage);
+  const aiIntent = await getAiIntent(rawMessage, {
+    service: state.service,
+    city: state.city,
+    accessibilityNeed: state.accessibilityNeed,
+    userGoal: state.userGoal,
+    selectedLocation: state.selectedLocation,
+    pendingQuestion: state.pendingQuestion,
+  });
   console.log("AI Intent:", aiIntent);
 
   const detectedService = detectService(message, aiIntent);
@@ -134,6 +145,7 @@ async function ask(req, res) {
   }
 
   const isFollowUpDocumentQuestion = isDocumentRequirementQuestion(message);
+  const locationReference = aiIntent?.locationReference || detectLocationReference(message);
 
   let locations = [];
 
@@ -146,16 +158,46 @@ async function ask(req, res) {
     state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
   }
 
-  const response = isFollowUpDocumentQuestion
-    ? buildDocumentRequirementsResponse(service, state.userGoal)
-    : buildResponseText(service, locations, state.city, state.accessibilityNeed);
+  const hasContext = Boolean(state.service || state.city || state.accessibilityNeed);
+  const intent = aiIntent?.intent || detectIntent(message, {
+    hasService: Boolean(service),
+    isNewService: serviceChanged,
+    accessibilityNeed,
+    locationReference,
+    isDocumentQuestion: isFollowUpDocumentQuestion,
+    hasContext,
+  });
 
-  state.pendingQuestion = /\?\s*$/.test(response) ? response : null;
+  const hasLocations = locations.length > 0 || Boolean(state.selectedLocation);
+  const clarification = aiIntent && typeof aiIntent.needsClarification === "boolean"
+    ? { needsClarification: aiIntent.needsClarification, clarificationQuestion: aiIntent.clarificationQuestion || null }
+    : detectClarification({ intent, service, locationReference, hasLocations });
+
+  let response;
+
+  if (clarification.needsClarification && clarification.clarificationQuestion) {
+    response = clarification.clarificationQuestion;
+  } else if (intent === "nearby_facilities" && locationReference) {
+    response = buildNearbyFacilitiesResponse(locations.length > 0 ? locations : (state.selectedLocation ? [state.selectedLocation] : []), state.city);
+  } else if (isFollowUpDocumentQuestion || intent === "service_information") {
+    response = buildDocumentRequirementsResponse(service, state.userGoal);
+  } else {
+    response = buildResponseText(service, locations, state.city, state.accessibilityNeed);
+  }
+
+  state.pendingQuestion = clarification.needsClarification
+    ? clarification.clarificationQuestion
+    : (/\?\s*$/.test(response) ? response : null);
+
   state.lastIntent = {
     service: service ? service.name : null,
+    userGoal: state.userGoal,
     accessibilityNeed,
     city,
-    userGoal: state.userGoal,
+    locationReference: locationReference || null,
+    intent,
+    needsClarification: clarification.needsClarification,
+    clarificationQuestion: clarification.clarificationQuestion,
   };
   state.lastResponse = response;
 

@@ -269,14 +269,109 @@ const buildDocumentRequirementsResponse = (service, userGoal) => {
   return `I don't have detailed document requirement information for ${service.name}${goalText} in my current data. I'd recommend confirming the exact requirements with your nearest ${service.name} office.`;
 };
 
+const LOCATION_REFERENCE_PATTERNS = [
+  { pattern: /\b(closest|nearest|nearby)\b/i, reference: "closest" },
+  { pattern: /\b(this one|that one|the first one|the second one|the last one)\b/i, reference: "selection" },
+];
+
+// Deterministic fallback: picks up references to a facility mentioned earlier in the chat.
+const detectLocationReference = (message) => {
+  for (const { pattern, reference } of LOCATION_REFERENCE_PATTERNS) {
+    if (pattern.test(message)) {
+      return reference;
+    }
+  }
+
+  return null;
+};
+
+const UI_COMMAND_PATTERN = /\b(open|enable|turn on|turn off|zoom in|zoom out|show me the map|start voice|open camera)\b/i;
+const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get)\b/i;
+const FACILITY_DETAILS_PATTERN = /\b(opening hours|open until|contact number|phone number|address of|what time)\b/i;
+
+// Deterministic fallback used when Gemini is unavailable or doesn't return an intent.
+const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext }) => {
+  if (isDocumentQuestion) {
+    return "service_information";
+  }
+
+  if (UI_COMMAND_PATTERN.test(message)) {
+    return "ui_command";
+  }
+
+  if (DIRECTIONS_PATTERN.test(message)) {
+    return "directions";
+  }
+
+  if (FACILITY_DETAILS_PATTERN.test(message)) {
+    return "facility_details";
+  }
+
+  if (locationReference) {
+    return "nearby_facilities";
+  }
+
+  if (accessibilityNeed && !isNewService) {
+    return "accessibility_question";
+  }
+
+  if (isNewService) {
+    return "find_service";
+  }
+
+  if (hasService) {
+    return "find_facility";
+  }
+
+  if (hasContext) {
+    return "follow_up_question";
+  }
+
+  return "general_help";
+};
+
+// Deterministic fallback: only ask for clarification when we genuinely can't proceed.
+const detectClarification = ({ intent, service, locationReference, hasLocations }) => {
+  if (!service && (intent === "service_information" || intent === "accessibility_question")) {
+    return {
+      needsClarification: true,
+      clarificationQuestion: "Which service is this about, for example Home Affairs, SASSA, Department of Health, Municipal Services or Education?",
+    };
+  }
+
+  if (locationReference && !hasLocations) {
+    return {
+      needsClarification: true,
+      clarificationQuestion: "I don't have any facilities to compare yet - which service or area are you asking about?",
+    };
+  }
+
+  return { needsClarification: false, clarificationQuestion: null };
+};
+
+// Honest about the lack of real distance data - we don't have the user's location.
+const buildNearbyFacilitiesResponse = (locations, city) => {
+  if (!locations || locations.length === 0) {
+    return "I don't have any matching facilities to compare yet. Could you tell me which service and area you need?";
+  }
+
+  const topMatch = locations[0];
+
+  return `I can't calculate exact travel distance without your location, but based on what I have, ${topMatch.name}${topMatch.city ? ` in ${topMatch.city}` : ""} looks like the closest match${city ? ` to ${city}` : ""}.`;
+};
+
 module.exports = {
   detectService,
   detectAccessibilityNeed,
   detectCity,
   detectUserGoal,
   isDocumentRequirementQuestion,
+  detectLocationReference,
+  detectIntent,
+  detectClarification,
   buildServiceLocations,
   buildResponseText,
   buildDocumentRequirementsResponse,
+  buildNearbyFacilitiesResponse,
   serviceByName,
 };
