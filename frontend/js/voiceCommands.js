@@ -121,262 +121,234 @@ function getAccessibilityFilterFromVoiceCommand(command) {
   return "all";
 }
 
+// Matches a whole phrase (word-boundary safe) so "find service" doesn't also match
+// "find services", and generic words like "help" can't match inside other words.
+function commandIncludesPhrase(command, phrase) {
+  const escapedPhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escapedPhrase}\\b`, "i").test(command);
+}
+
+// Explicit UI-control phrases only. Conversational words like "ID", "Home Affairs",
+// "wheelchair", "doctor" or "hospital" must never appear here - those belong in chat.
+const HANDS_FREE_COMMANDS = [
+  {
+    id: "text_size_increase",
+    phrases: [
+      "increase text size", "make text bigger", "bigger text", "larger text",
+      "make text larger", "text bigger", "text size up", "increase font size",
+      "make font bigger", "zoom in text", "bigger font"
+    ],
+    run: () => { changeTextSize(1); return true; }
+  },
+  {
+    id: "text_size_decrease",
+    phrases: [
+      "decrease text size", "make text smaller", "smaller text", "reduce text size",
+      "text smaller", "text size down", "decrease font size", "make font smaller",
+      "zoom out text", "smaller font"
+    ],
+    run: () => { changeTextSize(-1); return true; }
+  },
+  {
+    id: "high_contrast_on",
+    phrases: [
+      "turn on high contrast", "turn high contrast on", "enable high contrast",
+      "activate high contrast", "high contrast on", "turn on contrast",
+      "turn contrast on", "enable contrast", "activate contrast", "contrast on",
+      "switch on high contrast", "high contrast mode on"
+    ],
+    run: () => { setHighContrastMode(true); return true; }
+  },
+  {
+    id: "high_contrast_off",
+    phrases: [
+      "turn off high contrast", "turn high contrast off", "disable high contrast",
+      "deactivate high contrast", "high contrast off", "turn off contrast",
+      "turn contrast off", "disable contrast", "deactivate contrast", "contrast off",
+      "normal contrast", "low contrast", "switch off high contrast", "high contrast mode off"
+    ],
+    run: () => { setHighContrastMode(false); return true; }
+  },
+  {
+    id: "voice_responses_on",
+    phrases: [
+      "turn on voice responses", "turn voice responses on", "enable voice responses",
+      "activate voice responses", "turn on speech", "turn on voice output",
+      "voice responses on", "voice output on", "enable voice output"
+    ],
+    run: () => {
+      APP_STATE.voiceOutputEnabled = true;
+      const status = "Voice responses enabled.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "voice_responses_off",
+    phrases: [
+      "turn off voice responses", "turn voice responses off", "disable voice responses",
+      "deactivate voice responses", "turn off speech", "turn off voice output",
+      "voice responses off", "voice output off", "disable voice output",
+      "mute voice", "silence voice"
+    ],
+    run: () => {
+      APP_STATE.voiceOutputEnabled = false;
+      const status = "Voice responses disabled.";
+      updateHandsFreeStatus(status);
+      return true;
+    }
+  },
+  {
+    id: "show_home",
+    phrases: [
+      "open home", "go home", "show home", "home screen", "return home", "back home",
+      "take me home", "home please"
+    ],
+    run: () => {
+      showScreen("home-screen");
+      const status = "Opening home.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "show_services",
+    phrases: [
+      "open services", "show services", "find service", "go to services", "service list",
+      "government services", "show me services", "open the services screen",
+      "list government services"
+    ],
+    run: () => {
+      showScreen("services-screen");
+      const status = "Opening services.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "show_locations",
+    phrases: [
+      "open locations", "show locations", "accessible facilities", "find places",
+      "show accessible places", "open accessible facilities", "show nearby places",
+      "open the locations screen", "show me locations", "find accessible locations"
+    ],
+    run: () => {
+      showScreen("locations-screen");
+      const status = "Opening accessible locations.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "open_chat",
+    phrases: [
+      "open ask", "open chat", "ask thušo", "talk to thušo", "start chat",
+      "open the chat", "start a conversation", "chat with thušo"
+    ],
+    run: () => {
+      showScreen("ask-screen");
+      const status = "Opening chat.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "open_menu",
+    phrases: [
+      "open menu", "show menu", "open settings", "show settings", "go to menu",
+      "main menu", "open the settings", "show the menu", "go to settings"
+    ],
+    run: () => {
+      showScreen("menu-screen");
+      const status = "Opening menu.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "open_preferences",
+    phrases: [
+      "open preferences", "show preferences", "my preferences", "go to preferences",
+      "accessibility settings", "open the preferences screen", "show my preferences"
+    ],
+    run: () => {
+      showScreen("preferences-screen");
+      const status = "Opening preferences.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "open_saved",
+    phrases: [
+      "open saved", "show saved", "saved places", "my saved places",
+      "open my saved places", "show saved locations"
+    ],
+    run: () => {
+      showScreen("saved-screen");
+      const status = "Opening saved places.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "stop_hands_free",
+    phrases: [
+      "stop hands free", "exit hands free", "close hands free", "finish hands free",
+      "deactivate hands free", "turn off hands free", "cancel hands free", "end voice mode"
+    ],
+    run: () => { stopHandsFreeMode(); return true; }
+  },
+  {
+    id: "voice_help",
+    phrases: [
+      "what can you do", "what can i say", "voice help", "show commands",
+      "list commands", "what commands can i use", "help me use voice commands"
+    ],
+    run: () => {
+      const status = "Try open home, open services, open chat, turn on high contrast, increase text size, or ask a question like I need Home Affairs in Polokwane.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  }
+];
+
+// Classification flow: 1) explicit UI command, 2) conversational request, 3) unknown/empty.
+function classifyHandsFreeCommand(command) {
+  if (!command) {
+    return { type: "unknown" };
+  }
+
+  const matchedCommand = HANDS_FREE_COMMANDS.find(definition =>
+    definition.phrases.some(phrase => commandIncludesPhrase(command, phrase))
+  );
+
+  if (matchedCommand) {
+    return { type: "ui_command", definition: matchedCommand };
+  }
+
+  return { type: "conversational" };
+}
+
 function executeHandsFreeCommand(rawCommand) {
   const command = normaliseVoiceCommand(rawCommand);
+  const classification = classifyHandsFreeCommand(command);
 
-  if (!command) {
+  if (classification.type === "unknown") {
     return false;
   }
 
-  const matchesAny = terms => terms.some(term => command.includes(term));
-
-  if (
-    matchesAny([
-      "increase text size",
-      "make text bigger",
-      "bigger text",
-      "larger text",
-      "text bigger"
-    ]) || (
-      command.includes("text size") && /(up|increase|larger|bigger|more)/.test(command)
-    )
-  ) {
-    changeTextSize(1);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "decrease text size",
-      "make text smaller",
-      "smaller text",
-      "reduce text size",
-      "text smaller"
-    ]) || (
-      command.includes("text size") && /(down|decrease|smaller|less|reduce)/.test(command)
-    )
-  ) {
-    changeTextSize(-1);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "turn on high contrast",
-      "enable high contrast",
-      "activate high contrast",
-      "high contrast on",
-      "turn on contrast",
-      "enable contrast",
-      "activate contrast",
-      "contrast on"
-    ]) || (
-      command.includes("contrast") && /(on|enable|activate|light|bright)/.test(command)
-    )
-  ) {
-    setHighContrastMode(true);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "turn off high contrast",
-      "disable high contrast",
-      "deactivate high contrast",
-      "high contrast off",
-      "turn off contrast",
-      "disable contrast",
-      "deactivate contrast",
-      "contrast off",
-      "normal contrast",
-      "low contrast"
-    ]) || (
-      command.includes("contrast") && /(off|disable|deactivate|normal|low)/.test(command)
-    )
-  ) {
-    setHighContrastMode(false);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "turn on voice responses",
-      "enable voice responses",
-      "activate voice responses",
-      "turn on speech",
-      "turn on voice output"
-    ]) || (
-      command.includes("voice") && /on|enable|activate/.test(command)
-    )
-  ) {
-    APP_STATE.voiceOutputEnabled = true;
-    const status = "Voice responses enabled.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "turn off voice responses",
-      "disable voice responses",
-      "deactivate voice responses",
-      "turn off speech",
-      "turn off voice output"
-    ]) || (
-      command.includes("voice") && /off|disable|deactivate/.test(command)
-    )
-  ) {
-    APP_STATE.voiceOutputEnabled = false;
-    const status = "Voice responses disabled.";
-    updateHandsFreeStatus(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open home",
-      "go home",
-      "show home",
-      "home screen",
-      "return home",
-      "back home"
-    ])
-  ) {
-    showScreen("home-screen");
-    const status = "Opening home.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open services",
-      "show services",
-      "find service",
-      "go to services",
-      "service list",
-      "government services"
-    ])
-  ) {
-    showScreen("services-screen");
-    const status = "Opening services.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open locations",
-      "show locations",
-      "accessible facilities",
-      "find places",
-      "show accessible places",
-      "open accessible facilities",
-      "show nearby places"
-    ])
-  ) {
-    showScreen("locations-screen");
-    const status = "Opening accessible locations.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open ask",
-      "open chat",
-      "ask thušo",
-      "talk to thušo",
-      "start chat"
-    ])
-  ) {
-    showScreen("ask-screen");
-    const status = "Opening chat.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open menu",
-      "show menu",
-      "open settings",
-      "show settings",
-      "go to menu",
-      "main menu"
-    ])
-  ) {
-    showScreen("menu-screen");
-    const status = "Opening menu.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open preferences",
-      "show preferences",
-      "my preferences",
-      "go to preferences",
-      "accessibility settings"
-    ])
-  ) {
-    showScreen("preferences-screen");
-    const status = "Opening preferences.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "open saved",
-      "show saved",
-      "saved places",
-      "my saved places"
-    ])
-  ) {
-    showScreen("saved-screen");
-    const status = "Opening saved places.";
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "stop hands free",
-      "exit hands free",
-      "close hands free",
-      "finish hands free",
-      "deactivate hands free",
-      "turn off hands free"
-    ])
-  ) {
-    stopHandsFreeMode();
-    return true;
-  }
-
-  if (
-    matchesAny([
-      "help",
-      "what can you do",
-      "what can i say",
-      "voice help",
-      "show commands"
-    ])
-  ) {
-    const status = "Try open home, open services, open chat, turn on high contrast, increase text size, or ask a question like I need Home Affairs in Polokwane.";
-
-    updateHandsFreeStatus(status);
-    speakText(status);
-    return true;
+  if (classification.type === "ui_command") {
+    return classification.definition.run();
   }
 
   if (typeof sendChatMessage === "function") {
