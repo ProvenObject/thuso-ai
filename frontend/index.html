@@ -1234,9 +1234,29 @@
 </div>
 
 
-<!-- Existing application logic -->
-<script src="app.js"></script>
+<!-- Modular application initialization -->
+<!-- Config and utilities first -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 
+<!-- Application state -->
+<script src="js/state.js"></script>
+
+<!-- Core modules (independent) -->
+<script src="js/navigation.js"></script>
+<script src="js/accessibility.js"></script>
+<script src="js/services.js"></script>
+<script src="js/locations.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/camera.js"></script>
+
+<!-- Voice and interaction modules -->
+<script src="js/voiceInput.js"></script>
+<script src="js/voiceCommands.js"></script>
+<script src="js/preferences.js"></script>
+
+<!-- App bootstrap - initializes all modules -->
+<script src="js/app.js"></script>
 
 <!-- Initialise Lucide icons -->
 <script>
