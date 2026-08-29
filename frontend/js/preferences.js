@@ -123,20 +123,23 @@ function initialisePreferences() {
   }
 }
 
+// Shared by the emergency button and the "emergency help" voice command.
+function triggerEmergencyHelp() {
+  const message = "South African emergency numbers: 112 from a mobile phone, 10111 for police, and 10177 for ambulance services.";
+  updateHandsFreeStatus(message);
+
+  if (APP_STATE.voiceOutputEnabled) {
+    speakText(message);
+  }
+
+  if (window.confirm(`${message}\n\nCall 112 now?`)) {
+    window.location.href = "tel:112";
+  }
+}
+
 function initialiseEmergencyHelp() {
   const emergencyButton = document.getElementById("emergency-help-btn");
   if (!emergencyButton) return;
 
-  emergencyButton.addEventListener("click", () => {
-    const message = "South African emergency numbers: 112 from a mobile phone, 10111 for police, and 10177 for ambulance services.";
-    updateHandsFreeStatus(message);
-
-    if (APP_STATE.voiceOutputEnabled) {
-      speakText(message);
-    }
-
-    if (window.confirm(`${message}\n\nCall 112 now?`)) {
-      window.location.href = "tel:112";
-    }
-  });
+  emergencyButton.addEventListener("click", triggerEmergencyHelp);
 }

@@ -101,6 +101,8 @@ function speakText(text) {
 
   window.speechSynthesis.cancel();
 
+  APP_STATE.lastSpokenText = text;
+
   const speech = new SpeechSynthesisUtterance(text);
   speech.lang = "en-ZA";
   speech.rate = 1;

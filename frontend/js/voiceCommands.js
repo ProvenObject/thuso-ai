@@ -200,10 +200,23 @@ const HANDS_FREE_COMMANDS = [
     }
   },
   {
+    id: "go_back",
+    phrases: [
+      "go back", "previous screen", "back button", "go to previous screen", "take me back"
+    ],
+    run: () => {
+      showScreen(APP_STATE.previousScreen || "home-screen");
+      const status = "Going back.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
     id: "show_home",
     phrases: [
       "open home", "go home", "show home", "home screen", "return home", "back home",
-      "take me home", "home please"
+      "take me home", "home please", "go to home screen"
     ],
     run: () => {
       showScreen("home-screen");
@@ -300,10 +313,199 @@ const HANDS_FREE_COMMANDS = [
     }
   },
   {
+    id: "reset_text_size",
+    phrases: [
+      "reset text size", "reset font size", "default text size", "restore text size"
+    ],
+    run: () => {
+      const textSizeInput = document.getElementById("text-size");
+      document.documentElement.style.fontSize = "16px";
+      if (textSizeInput) {
+        textSizeInput.value = "16";
+      }
+      const status = "Text size reset to default.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "filter_wheelchair_accessible",
+    phrases: [
+      "filter wheelchair accessible", "show wheelchair accessible locations",
+      "filter by wheelchair access", "wheelchair accessible filter",
+      "filter for wheelchair access", "turn on wheelchair filter"
+    ],
+    run: () => {
+      showScreen("locations-screen");
+      setTimeout(() => setLocationFilterByName("wheelchairAccessible"), 400);
+      const status = "Filtering for wheelchair accessible locations.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "filter_audio_guidance",
+    phrases: [
+      "filter audio guidance", "show audio guidance locations",
+      "filter by audio guidance", "audio guidance filter", "turn on audio guidance filter"
+    ],
+    run: () => {
+      showScreen("locations-screen");
+      setTimeout(() => setLocationFilterByName("audioGuidance"), 400);
+      const status = "Filtering for locations with audio guidance.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "filter_sign_language",
+    phrases: [
+      "filter sign language", "show sign language locations",
+      "filter by sign language support", "sign language filter", "turn on sign language filter"
+    ],
+    run: () => {
+      showScreen("locations-screen");
+      setTimeout(() => setLocationFilterByName("signLanguageSupport"), 400);
+      const status = "Filtering for locations with sign language support.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "filter_accessible_entrance",
+    phrases: [
+      "filter accessible entrance", "show accessible entrance locations",
+      "filter by accessible entrance", "accessible entrance filter",
+      "turn on accessible entrance filter"
+    ],
+    run: () => {
+      showScreen("locations-screen");
+      setTimeout(() => setLocationFilterByName("accessibleEntrance"), 400);
+      const status = "Filtering for locations with an accessible entrance.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "read_aloud_on",
+    phrases: [
+      "turn on read aloud", "enable read aloud", "activate read aloud", "read aloud on"
+    ],
+    run: () => {
+      setReadAloudMode(true);
+      const status = "Read aloud enabled.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "read_aloud_off",
+    phrases: [
+      "turn off read aloud", "disable read aloud", "deactivate read aloud", "read aloud off"
+    ],
+    run: () => {
+      setReadAloudMode(false);
+      const status = "Read aloud disabled.";
+      updateHandsFreeStatus(status);
+      return true;
+    }
+  },
+  {
+    id: "stop_reading",
+    phrases: [
+      "stop reading", "stop talking", "stop speaking", "be quiet"
+    ],
+    run: () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      APP_STATE.isAssistantSpeaking = false;
+      updateHandsFreeStatus("Stopped reading.");
+      return true;
+    }
+  },
+  {
+    id: "repeat_last_response",
+    phrases: [
+      "repeat that", "say that again", "repeat", "say again", "what did you say"
+    ],
+    run: () => {
+      if (!APP_STATE.lastSpokenText) {
+        const status = "There's nothing to repeat yet.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+      }
+
+      speakText(APP_STATE.lastSpokenText);
+      return true;
+    }
+  },
+  {
+    id: "hands_free_start",
+    phrases: [
+      "start hands free", "begin hands free", "enable hands free",
+      "turn on hands free", "start listening"
+    ],
+    run: () => {
+      if (APP_STATE.handsFreeModeActive) {
+        return true;
+      }
+
+      APP_STATE.handsFreeModeActive = true;
+      APP_STATE.handsFreePaused = false;
+      const status = "Hands free mode started. Say a command.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "hands_free_pause",
+    phrases: [
+      "pause hands free", "pause listening", "pause"
+    ],
+    run: () => {
+      APP_STATE.handsFreePaused = true;
+      const status = "Hands free paused. Say resume to continue.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "hands_free_resume",
+    phrases: [
+      "resume hands free", "resume listening", "resume"
+    ],
+    run: () => {
+      APP_STATE.handsFreePaused = false;
+      const status = "Hands free resumed.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "emergency_help",
+    phrases: [
+      "emergency help", "i need emergency help", "call emergency services",
+      "need emergency help", "emergency services"
+    ],
+    run: () => { triggerEmergencyHelp(); return true; }
+  },
+  {
     id: "stop_hands_free",
     phrases: [
       "stop hands free", "exit hands free", "close hands free", "finish hands free",
-      "deactivate hands free", "turn off hands free", "cancel hands free", "end voice mode"
+      "deactivate hands free", "turn off hands free", "cancel hands free", "end voice mode",
+      "goodbye", "bye", "exit", "stop"
     ],
     run: () => { stopHandsFreeMode(); return true; }
   },
@@ -347,6 +549,17 @@ function executeHandsFreeCommand(rawCommand) {
     return false;
   }
 
+  // While paused, only listen for the commands needed to resume or fully stop.
+  const HANDS_FREE_PAUSE_OVERRIDE_IDS = new Set(["hands_free_resume", "stop_hands_free"]);
+
+  if (
+    APP_STATE.handsFreePaused &&
+    !(classification.type === "ui_command" && HANDS_FREE_PAUSE_OVERRIDE_IDS.has(classification.definition.id))
+  ) {
+    updateHandsFreeStatus("Hands free is paused. Say resume to continue.");
+    return true;
+  }
+
   if (classification.type === "ui_command") {
     return classification.definition.run();
   }
@@ -362,6 +575,7 @@ function executeHandsFreeCommand(rawCommand) {
 
 function stopHandsFreeMode() {
   APP_STATE.handsFreeModeActive = false;
+  APP_STATE.handsFreePaused = false;
 
   if (APP_STATE.handsFreeListenTimer) {
     clearTimeout(APP_STATE.handsFreeListenTimer);
