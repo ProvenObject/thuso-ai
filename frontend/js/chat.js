@@ -268,6 +268,15 @@ async function sendChatMessage(message) {
 
 
     // --------------------------------------------------------
+    // Backend-driven UI action
+    // --------------------------------------------------------
+
+    handleBackendAction(
+      data.action
+    );
+
+
+    // --------------------------------------------------------
     // Speak response
     // --------------------------------------------------------
 
@@ -319,6 +328,71 @@ async function sendChatMessage(message) {
 
     scrollChatToBottom();
 
+  }
+}
+
+
+// ------------------------------------------------------------
+// BACKEND ACTION
+// ------------------------------------------------------------
+
+// Interprets the structured action from /api/ask using existing screens/functions only.
+function handleBackendAction(action) {
+  if (!action || !action.type || action.type === "none") {
+    return;
+  }
+
+  switch (action.type) {
+    case "show_services":
+      showScreen("services-screen");
+      break;
+
+    case "show_locations":
+      if (action.serviceId) {
+        loadLocations({ id: action.serviceId, name: action.serviceName || "" }).then(() => {
+          if (action.accessibilityNeed) {
+            setLocationFilterByName(action.accessibilityNeed);
+          }
+        });
+      }
+      break;
+
+    case "show_location_details":
+      if (action.locationId) {
+        loadLocationDetails(action.locationId, "ask-screen");
+      }
+      break;
+
+    case "filter_locations":
+      if (action.serviceId) {
+        loadLocations({ id: action.serviceId, name: action.serviceName || "" }).then(() => {
+          if (action.accessibilityNeed) {
+            setLocationFilterByName(action.accessibilityNeed);
+          }
+        });
+      } else if (action.accessibilityNeed) {
+        setLocationFilterByName(action.accessibilityNeed);
+      }
+      break;
+
+    case "show_preferences":
+      showScreen("preferences-screen");
+      break;
+
+    case "show_home":
+      showScreen("home-screen");
+      break;
+
+    case "open_directions":
+      if (action.locationId && (!APP_STATE.currentLocation || String(APP_STATE.currentLocation.id) !== String(action.locationId))) {
+        loadLocationDetails(action.locationId, "ask-screen").then(() => openDirections());
+      } else {
+        openDirections();
+      }
+      break;
+
+    default:
+      console.warn("Unknown backend action type:", action.type);
   }
 }
 
