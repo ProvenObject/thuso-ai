@@ -91,7 +91,7 @@ function speakText(text) {
     return;
   }
 
-  if (APP_STATE.handsFreeModeActive && APP_STATE.handsFreeRecognition) {
+  if (APP_STATE.handsFreeModeActive && APP_STATE.handsFreeRecognition && APP_STATE.isHandsFreeListening) {
     try {
       APP_STATE.handsFreeRecognition.stop();
     } catch (error) {
@@ -121,9 +121,7 @@ function speakText(text) {
     }
 
     if (APP_STATE.handsFreeModeActive) {
-      setTimeout(() => {
-        resumeHandsFreeListening();
-      }, 300);
+      resumeHandsFreeListening(300);
     }
   });
 
@@ -131,9 +129,7 @@ function speakText(text) {
     APP_STATE.isAssistantSpeaking = false;
 
     if (APP_STATE.handsFreeModeActive) {
-      setTimeout(() => {
-        resumeHandsFreeListening();
-      }, 300);
+      resumeHandsFreeListening(300);
     }
   });
 

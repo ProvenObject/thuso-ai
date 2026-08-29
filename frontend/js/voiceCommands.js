@@ -463,6 +463,7 @@ const HANDS_FREE_COMMANDS = [
       const status = "Hands free mode started. Say a command.";
       updateHandsFreeStatus(status);
       speakText(status);
+      resumeHandsFreeListening();
       return true;
     }
   },
@@ -590,6 +591,8 @@ function stopHandsFreeMode() {
     }
   }
 
+  APP_STATE.isHandsFreeListening = false;
+
   const handsFreeButton = document.getElementById("hands-free-btn");
 
   if (handsFreeButton) {
@@ -599,8 +602,19 @@ function stopHandsFreeMode() {
   updateHandsFreeStatus("Hands free mode off.");
 }
 
-function resumeHandsFreeListening() {
-  if (!APP_STATE.handsFreeModeActive || !APP_STATE.handsFreeRecognition || APP_STATE.isAssistantSpeaking) {
+// Single gatekeeper for starting recognition again. Every trigger (recognition end,
+// recognition error, TTS end, TTS error, chat request finishing) funnels through this
+// so we can never listen while speaking/waiting, and never start recognition twice.
+// Note: "paused" deliberately does NOT stop listening here - the mic must stay on so
+// executeHandsFreeCommand can still hear "resume"/"stop hands free" while paused.
+function startHandsFreeListening() {
+  if (
+    !APP_STATE.handsFreeModeActive ||
+    APP_STATE.isAssistantSpeaking ||
+    APP_STATE.isWaitingForResponse ||
+    APP_STATE.isHandsFreeListening ||
+    !APP_STATE.handsFreeRecognition
+  ) {
     return;
   }
 
@@ -609,6 +623,19 @@ function resumeHandsFreeListening() {
   } catch (error) {
     console.warn("Unable to resume hands free recognition:", error);
   }
+}
+
+// Debounced: re-scheduling replaces any pending attempt instead of stacking timers,
+// which is what prevented duplicate automatic restarts.
+function resumeHandsFreeListening(delay = 300) {
+  if (APP_STATE.handsFreeListenTimer) {
+    clearTimeout(APP_STATE.handsFreeListenTimer);
+  }
+
+  APP_STATE.handsFreeListenTimer = setTimeout(() => {
+    APP_STATE.handsFreeListenTimer = null;
+    startHandsFreeListening();
+  }, delay);
 }
 
 function initialiseHandsFreeControls() {
@@ -637,6 +664,7 @@ function initialiseHandsFreeControls() {
 
   APP_STATE.handsFreeRecognition.addEventListener("start", () => {
     APP_STATE.handsFreeModeActive = true;
+    APP_STATE.isHandsFreeListening = true;
     handsFreeButton.classList.add("recording");
     updateHandsFreeStatus("Listening for voice commands...");
   });
@@ -666,26 +694,25 @@ function initialiseHandsFreeControls() {
   });
 
   APP_STATE.handsFreeRecognition.addEventListener("end", () => {
+    APP_STATE.isHandsFreeListening = false;
     handsFreeButton.classList.remove("recording");
 
+    // Recognition always ends after one utterance (continuous = false). If nothing
+    // else is pending (speech, a chat request), this is what brings the mic back.
     if (APP_STATE.handsFreeModeActive) {
-      if (APP_STATE.handsFreeListenTimer) {
-        clearTimeout(APP_STATE.handsFreeListenTimer);
-      }
-
-      APP_STATE.handsFreeListenTimer = setTimeout(() => {
-        if (!APP_STATE.handsFreeModeActive || APP_STATE.isAssistantSpeaking) {
-          return;
-        }
-
-        resumeHandsFreeListening();
-      }, 350);
+      resumeHandsFreeListening(350);
     }
   });
 
   APP_STATE.handsFreeRecognition.addEventListener("error", event => {
+    APP_STATE.isHandsFreeListening = false;
+
     if (event.error !== "no-speech" && event.error !== "aborted") {
       console.warn("Hands free recognition error:", event.error);
+    }
+
+    if (APP_STATE.handsFreeModeActive) {
+      resumeHandsFreeListening(350);
     }
   });
 
@@ -696,8 +723,11 @@ function initialiseHandsFreeControls() {
     }
 
     APP_STATE.handsFreeModeActive = true;
+    APP_STATE.handsFreePaused = false;
     updateHandsFreeStatus("Hands free mode started. Say a command.");
     speakText("Hands free mode started. Say a command.");
+    // Safety net in case voice output is disabled and no TTS "end" event ever fires.
+    resumeHandsFreeListening();
   });
 
   updateHandsFreeStatus("Hands free ready.");

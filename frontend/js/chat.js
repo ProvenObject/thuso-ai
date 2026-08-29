@@ -315,6 +315,10 @@ async function sendChatMessage(message) {
       "Connection problem"
     );
 
+    speakText(
+      errorMessage
+    );
+
 
     return null;
 
@@ -325,6 +329,12 @@ async function sendChatMessage(message) {
 
     APP_STATE.isWaitingForResponse =
       false;
+
+    // Safety net: if no TTS ends up playing for this turn, this still brings the
+    // mic back once the request is no longer in flight.
+    if (typeof resumeHandsFreeListening === "function") {
+      resumeHandsFreeListening();
+    }
 
     scrollChatToBottom();
 

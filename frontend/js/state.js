@@ -14,6 +14,7 @@ const APP_STATE = {
   isAssistantSpeaking: false,
   handsFreeModeActive: false,
   handsFreePaused: false,
+  isHandsFreeListening: false,
   handsFreeListenTimer: null,
   cameraStream: null,
   isOcrProcessing: false,
