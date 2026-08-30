@@ -153,16 +153,20 @@ async function ask(req, res) {
     locations = buildServiceLocations(service, state.city, state.accessibilityNeed);
   }
 
-  if (locations.length === 1) {
-    const onlyMatch = locations[0];
-    state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
-  }
-
-  // A single location for the stated city is confident enough to treat as "the" facility being asked about.
+  // A single location for the stated city (or the only location overall) is confident
+  // enough to treat as "the" facility the user is now asking about.
   const cityMatches = city
     ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
     : [];
-  const hasConfidentLocationMatch = cityMatches.length === 1 || locations.length === 1;
+  const confidentLocation = cityMatches.length === 1
+    ? cityMatches[0]
+    : (locations.length === 1 ? locations[0] : state.selectedLocation);
+  const hasConfidentLocationMatch = Boolean(confidentLocation);
+
+  if (cityMatches.length === 1 || locations.length === 1) {
+    const onlyMatch = cityMatches.length === 1 ? cityMatches[0] : locations[0];
+    state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
+  }
 
   const hasContext = Boolean(state.service || state.city || state.accessibilityNeed);
   const intent = aiIntent?.intent || detectIntent(message, {
@@ -189,7 +193,14 @@ async function ask(req, res) {
   } else if (isFollowUpDocumentQuestion || intent === "service_information") {
     response = buildDocumentRequirementsResponse(service, state.userGoal);
   } else {
-    response = buildResponseText(service, locations, state.city, state.accessibilityNeed);
+    response = buildResponseText({
+      service,
+      locations,
+      city: state.city,
+      accessibilityNeed: state.accessibilityNeed,
+      userGoal: state.userGoal,
+      focusLocation: confidentLocation,
+    });
   }
 
   state.pendingQuestion = clarification.needsClarification

@@ -179,44 +179,108 @@ const buildServiceLocations = (service, city, accessibilityNeed) => {
   return serviceLocations.sort((a, b) => b.relevanceScore - a.relevanceScore);
 };
 
-const buildResponseText = (service, locations, city, accessibilityNeed) => {
+const ACCESSIBILITY_LABELS = {
+  wheelchairAccessible: "wheelchair access",
+  audioGuidance: "audio guidance",
+  signLanguageSupport: "sign language support",
+  accessibleEntrance: "an accessible entrance",
+};
+
+// Used for the very first mention of a service, so the intro names the actual topic
+// instead of a generic "I can help with X" repeated on every turn.
+const SERVICE_DEFAULT_TOPICS = {
+  "Home Affairs": "identity documents and civil registration",
+  SASSA: "social grants",
+  "Department of Health": "healthcare services",
+  "Municipal Services": "municipal services",
+  Education: "education and bursary support",
+};
+
+const GOAL_TOPICS = {
+  "applying for or renewing a passport": "passport applications",
+  "obtaining a birth certificate": "birth certificates",
+  "obtaining a marriage certificate": "marriage certificates",
+  "obtaining or replacing an identity document": "identity documents",
+  "applying for or managing a social grant": "social grants",
+  "accessing healthcare services": "healthcare services",
+  "resolving a municipal services matter": "municipal services",
+  "accessing education or bursary support": "education and bursary support",
+};
+
+const describeServiceTopic = (service, userGoal) => {
+  if (!service) {
+    return "";
+  }
+
+  return GOAL_TOPICS[userGoal] || SERVICE_DEFAULT_TOPICS[service.name] || service.name;
+};
+
+// Raw accessibility value for one specific location - null means "not on record", not "no".
+const getAccessibilityValue = (locationId, accessibilityNeed) => {
+  if (!locationId || !accessibilityNeed) {
+    return null;
+  }
+
+  const record = accessibilityData.locations.find((item) => item.id === locationId);
+  const value = record ? record[accessibilityNeed] : undefined;
+
+  return typeof value === "boolean" ? value : null;
+};
+
+// Answers the LATEST turn directly (a specific facility, a city match, an accessibility
+// question) instead of repeating the same generic service introduction every time.
+const buildResponseText = ({ service, locations, city, accessibilityNeed, userGoal, focusLocation }) => {
   if (!service) {
     return "I'm not sure which government service can help with that. Try telling me what you need help with, for example an ID, grant, doctor, municipality, school or bursary.";
   }
 
-  const accessibilityLabels = {
-    wheelchairAccessible: "wheelchair access",
-    audioGuidance: "audio guidance",
-    signLanguageSupport: "sign language support",
-    accessibleEntrance: "an accessible entrance",
-  };
+  const accessibilityLabel = accessibilityNeed ? (ACCESSIBILITY_LABELS[accessibilityNeed] || "that accessibility need") : null;
+
+  // A direct accessibility question about one already-identified facility gets a direct answer.
+  if (accessibilityNeed && focusLocation) {
+    const value = getAccessibilityValue(focusLocation.id, accessibilityNeed);
+    const placeText = `the ${service.name} office${focusLocation.city ? ` in ${focusLocation.city}` : ""}`;
+
+    if (value === true) {
+      return `Yes, ${placeText} has ${accessibilityLabel}.`;
+    }
+
+    if (value === false) {
+      return `No, ${placeText} does not have ${accessibilityLabel} on record.`;
+    }
+
+    return `I don't have confirmed information about ${accessibilityLabel} for ${placeText}. I'd suggest contacting them directly to confirm.`;
+  }
 
   const matchingLocations = locations.filter((location) => location.accessibilityMatch);
 
-  if (city && !accessibilityNeed) {
-    const cityLocationCount = locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase()).length;
-
-    if (cityLocationCount > 0) {
-      return `I found ${service.name} options in ${city}. ${matchingLocations.length > 0 ? `I’ve highlighted ${matchingLocations.length} accessible option${matchingLocations.length === 1 ? "" : "s"}.` : "Are you looking for wheelchair accessibility?"}`;
-    }
-
-    return `I found ${service.name} options nearby, but not specifically in ${city}. I can narrow the search by accessibility or look for the nearest matching office.`;
-  }
-
   if (accessibilityNeed) {
     if (matchingLocations.length > 0) {
-      const targetText = accessibilityLabels[accessibilityNeed] || "accessibility support";
-      return `I found ${matchingLocations.length} ${service.name} location${matchingLocations.length === 1 ? "" : "s"}${city ? ` in ${city}` : ""} with ${targetText}.`;
+      return `I found ${matchingLocations.length} ${service.name} location${matchingLocations.length === 1 ? "" : "s"}${city ? ` in ${city}` : ""} with ${accessibilityLabel}.`;
     }
 
-    return `I found ${service.name} options${city ? ` in ${city}` : ""}, but I couldn’t confirm ${accessibilityLabels[accessibilityNeed] || "that accessibility need"} in the current list.`;
+    return `I found ${service.name} options${city ? ` in ${city}` : ""}, but none are confirmed to have ${accessibilityLabel}.`;
   }
 
   if (city) {
-    return `I found ${service.name} options in ${city}. Are you looking for wheelchair accessibility?`;
+    const cityMatches = locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase());
+
+    if (cityMatches.length === 1) {
+      return `I found the ${service.name} office in ${city}. Would you like its details or directions?`;
+    }
+
+    if (cityMatches.length > 1) {
+      return `I found ${cityMatches.length} ${service.name} options in ${city}. Would you like directions to one, or details on accessibility?`;
+    }
+
+    if (locations.length > 0) {
+      return `I found ${service.name} options nearby, but not specifically in ${city}. I can look for the nearest matching office instead.`;
+    }
+
+    return `I couldn't find a ${service.name} office in ${city} in my current data.`;
   }
 
-  return `I can help with ${service.name}. Which town are you in?`;
+  return `${service.name} can help with ${describeServiceTopic(service, userGoal)}. Which town are you in?`;
 };
 
 const goalsByService = {
@@ -272,7 +336,7 @@ const buildDocumentRequirementsResponse = (service, userGoal) => {
 
   const goalText = userGoal ? ` for ${userGoal}` : "";
 
-  return `I don't have detailed document requirement information for ${service.name}${goalText} in my current data. I'd recommend confirming the exact requirements with your nearest ${service.name} office.`;
+  return `I don't have official document requirements for ${service.name}${goalText} in my data. Please confirm the exact list with your nearest ${service.name} office.`;
 };
 
 const LOCATION_REFERENCE_PATTERNS = [
