@@ -272,7 +272,13 @@ async function sendChatMessage(message) {
     // --------------------------------------------------------
 
     handleBackendAction(
-      data.action
+      data.action,
+      {
+        allowLocationNavigation:
+          isExplicitLocationNavigationRequest(
+            cleanMessage
+          )
+      }
     );
 
 
@@ -346,8 +352,12 @@ async function sendChatMessage(message) {
 // BACKEND ACTION
 // ------------------------------------------------------------
 
+function isExplicitLocationNavigationRequest(message) {
+  return /\b(show|open|view|find|take me to)\b.*\b(location|locations|office|offices|facility|facilities)\b/i.test(message);
+}
+
 // Interprets the structured action from /api/ask using existing screens/functions only.
-function handleBackendAction(action) {
+function handleBackendAction(action, options = {}) {
   if (!action || !action.type || action.type === "none") {
     return;
   }
@@ -358,6 +368,10 @@ function handleBackendAction(action) {
       break;
 
     case "show_locations":
+      if (!options.allowLocationNavigation) {
+        break;
+      }
+
       if (action.serviceId) {
         loadLocations({ id: action.serviceId, name: action.serviceName || "" }).then(() => {
           if (action.accessibilityNeed) {
@@ -374,6 +388,10 @@ function handleBackendAction(action) {
       break;
 
     case "filter_locations":
+      if (!options.allowLocationNavigation) {
+        break;
+      }
+
       if (action.serviceId) {
         loadLocations({ id: action.serviceId, name: action.serviceName || "" }).then(() => {
           if (action.accessibilityNeed) {
