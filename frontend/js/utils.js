@@ -59,6 +59,8 @@ async function fetchJson(url, options = {}) {
   return response.json();
 }
 
+const MAX_LOCATION_ACCURACY_METRES = 50000;
+
 function calculateDistanceInKilometres(from, to) {
   const earthRadius = 6371;
   const toRadians = degrees => degrees * Math.PI / 180;
@@ -89,6 +91,6 @@ function calculateDistanceInKilometres(from, to) {
 
 function formatDistance(distanceInKilometres) {
   return distanceInKilometres < 1
-    ? `${Math.round(distanceInKilometres * 1000)} m away`
-    : `${distanceInKilometres.toFixed(1)} km away`;
+    ? `${Math.round(distanceInKilometres * 1000)} m away (straight line)`
+    : `${distanceInKilometres.toFixed(1)} km away (straight line)`;
 }

@@ -2,6 +2,8 @@
 function setHighContrastMode(enabled) {
   const isEnabled = !!enabled;
 
+  APP_STATE.highContrastEnabled = isEnabled;
+
   document.body.classList.toggle("high-contrast-mode", isEnabled);
 
   const contrastToggle = document.getElementById("high-contrast-toggle");
@@ -11,6 +13,10 @@ function setHighContrastMode(enabled) {
   const status = isEnabled ? "High contrast enabled." : "High contrast disabled.";
   updateHandsFreeStatus(status);
   speakText(status);
+
+  if (APP_STATE.authUser) {
+    persistCurrentAuthProfile();
+  }
 }
 
 function setReadAloudMode(enabled) {
@@ -53,42 +59,90 @@ function changeTextSize(delta) {
 }
 
 function updateLocationCardDistances() {
-  if (!APP_STATE.currentUserPosition) return;
+  const userLocation = APP_STATE.currentUserPosition;
 
   document.querySelectorAll("#locations-list .location-card").forEach(card => {
+    const distanceElement = card.querySelector(".location-distance");
+    if (!distanceElement) return;
+
     const latitude = Number(card.dataset.latitude);
     const longitude = Number(card.dataset.longitude);
-    const distanceElement = card.querySelector(".location-distance");
 
-    if (!distanceElement || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    // Keep the existing behaviour for missing coordinates, but only show a numeric
+    // straight-line distance when the browser's location accuracy is good enough.
+    if (!userLocation || !Number.isFinite(userLocation.latitude) || !Number.isFinite(userLocation.longitude)) {
+      distanceElement.textContent = "Distance unavailable";
+      distanceElement.hidden = false;
       return;
     }
 
-    const distance = calculateDistanceInKilometres(
-      APP_STATE.currentUserPosition,
-      { latitude, longitude }
-    );
+    if (!Number.isFinite(userLocation.accuracy) || userLocation.accuracy > MAX_LOCATION_ACCURACY_METRES) {
+      distanceElement.textContent = "Distance unavailable";
+      distanceElement.hidden = false;
+      return;
+    }
 
-    if (distance === null) return;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      distanceElement.textContent = "Distance unavailable";
+      distanceElement.hidden = false;
+      return;
+    }
+
+    const distance = calculateDistanceInKilometres(userLocation, { latitude, longitude });
+
+    if (distance === null) {
+      distanceElement.textContent = "Distance unavailable";
+      distanceElement.hidden = false;
+      return;
+    }
 
     distanceElement.textContent = formatDistance(distance);
     distanceElement.hidden = false;
   });
 }
 
-function requestCurrentLocation() {
+function requestCurrentLocation(force = false) {
   if (!navigator.geolocation) return;
+
+  const hasValidPosition = APP_STATE.currentUserPosition &&
+    Number.isFinite(APP_STATE.currentUserPosition.latitude) &&
+    Number.isFinite(APP_STATE.currentUserPosition.longitude) &&
+    Number.isFinite(APP_STATE.currentUserPosition.accuracy) &&
+    APP_STATE.currentUserPosition.accuracy <= MAX_LOCATION_ACCURACY_METRES;
+
+  // Prefer a fresh browser fix instead of reusing stale cached coordinates.
+  if (!force && hasValidPosition) {
+    updateLocationCardDistances();
+    return;
+  }
+
+  if (APP_STATE.locationRequestInFlight) {
+    return;
+  }
+
+  APP_STATE.locationRequestInFlight = true;
 
   navigator.geolocation.getCurrentPosition(
     position => {
       APP_STATE.currentUserPosition = {
         latitude: position.coords.latitude,
-        longitude: position.coords.longitude
+        longitude: position.coords.longitude,
+        accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null
       };
+      APP_STATE.locationRequestInFlight = false;
       updateLocationCardDistances();
     },
-    error => console.info("Current location is unavailable:", error.message),
-    { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 }
+    error => {
+      APP_STATE.locationRequestInFlight = false;
+      APP_STATE.currentUserPosition = {
+        latitude: null,
+        longitude: null,
+        accuracy: null
+      };
+      console.info("Current location is unavailable:", error.message);
+      updateLocationCardDistances();
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
   );
 }
 

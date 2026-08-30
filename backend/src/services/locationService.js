@@ -492,15 +492,27 @@ const detectClarification = ({ intent, service, locationReference, hasLocations 
   return { needsClarification: false, clarificationQuestion: null };
 };
 
-// Honest about the lack of real distance data - we don't have the user's location.
+// Exact physical distance is only possible when the browser provides location data.
+// Without that, we should not pretend a facility is physically closest.
 const buildNearbyFacilitiesResponse = (locations, city) => {
   if (!locations || locations.length === 0) {
     return "I don't have any matching facilities to compare yet. Could you tell me which service and area you need?";
   }
 
-  const topMatch = locations[0];
+  const cityMatches = city
+    ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
+    : [];
 
-  return `I can't calculate exact travel distance without your location, but based on what I have, ${topMatch.name}${topMatch.city ? ` in ${topMatch.city}` : ""} looks like the closest match${city ? ` to ${city}` : ""}.`;
+  if (cityMatches.length > 0) {
+    const label = cityMatches.length === 1 ? "facility" : "facilities";
+    return `I found ${cityMatches.length} matching ${label} in ${city}. I can use the town match, but I need your browser location before I can calculate exact physical distance between facilities.`;
+  }
+
+  if (city) {
+    return `I found ${locations.length} option${locations.length === 1 ? "" : "s"}, but not specifically in ${city}. Please share your town or allow location access so I can compare exact physical distance.`;
+  }
+
+  return "I need your town or your browser location before I can calculate exact physical distance between facilities.";
 };
 
 module.exports = {

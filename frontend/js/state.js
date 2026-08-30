@@ -5,9 +5,16 @@ const APP_STATE = {
   currentService: null,
   voiceOutputEnabled: true,
   readAloudEnabled: false,
+  highContrastEnabled: false,
   mobilityPreferenceEnabled: false,
   appLanguage: "en",
-  currentUserPosition: null,
+  authUser: null,
+  currentUserPosition: {
+    latitude: null,
+    longitude: null,
+    accuracy: null
+  },
+  locationRequestInFlight: false,
   recognition: null,
   handsFreeRecognition: null,
   isListening: false,

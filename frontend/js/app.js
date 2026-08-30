@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initialiseSearch();
   initialiseFilterChips();
   initialisePreferences();
+  initialiseAuth();
   initialiseChatSuggestions();
   initialiseLocationBackButton();
   initialiseEmergencyHelp();

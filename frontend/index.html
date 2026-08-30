@@ -94,11 +94,11 @@
 
             <div class="welcome-section">
 
-                <p class="welcome-label">
+                <p id="welcome-label" class="welcome-label">
                     Hello! 👋
                 </p>
 
-                <h2>
+                <h2 id="welcome-title">
                     How can Thušo<br>
                     help you today?
                 </h2>
@@ -855,8 +855,6 @@
 
         <section class="preferences-content">
 
-            <!-- Accessibility -->
-
             <div class="preference-section">
 
                 <h3>Accessibility Needs</h3>
@@ -1072,6 +1070,89 @@
 
 
     <!-- =========================================
+         LOGIN SCREEN
+    ========================================== -->
+
+    <main
+        id="login-screen"
+        class="screen"
+    >
+
+        <header class="screen-header">
+
+            <button
+                class="back-btn"
+                type="button"
+                onclick="showScreen('menu-screen')"
+                aria-label="Go back"
+            >
+                <i data-lucide="arrow-left"></i>
+            </button>
+
+            <div class="screen-header-title">
+
+                <h2>Login</h2>
+
+                <p>
+                    Optional demo sign in for saved preferences
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="preferences-content">
+
+            <div class="profile-card">
+
+                <div class="profile-card-header">
+                    <div>
+                        <p class="profile-label">Profile</p>
+                        <div id="auth-status" class="auth-status guest-status">
+                            Guest mode
+                        </div>
+                    </div>
+
+                    <button id="logout-btn" class="auth-btn secondary-btn" type="button">Logout</button>
+                </div>
+
+                <label class="auth-label" for="demo-user-select">Demo user</label>
+                <select id="demo-user-select" class="select-input auth-select">
+                    <option value="tokelo-mashiane">Tokelo Mashiane</option>
+                    <option value="carol-mashatola">Carol Mashatola</option>
+                    <option value="nkadimeng-dimpe">Nkadimeng Dimpe</option>
+                    <option value="dineo-maphalle">Dineo Maphalle</option>
+                    <option value="lufuno-nekhumbe">Lufuno Nekhumbe</option>
+                    <option value="jackie-ramalebane">Jackie Ramalebane</option>
+                </select>
+
+                <label class="auth-label" for="demo-password-input">Demo password</label>
+                <div class="profile-login-row">
+                    <input
+                        id="demo-password-input"
+                        class="select-input auth-password"
+                        type="password"
+                        autocomplete="off"
+                        placeholder="ThušoDemo2026!"
+                    >
+
+                    <button id="sign-in-btn" class="primary-btn auth-btn sign-in-btn" type="button">Sign in</button>
+                </div>
+
+                <p class="demo-password-hint">
+                    Demo password: ThušoDemo2026!
+                </p>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+
+    <!-- =========================================
          MENU SCREEN
     ========================================== -->
 
@@ -1100,6 +1181,26 @@
 
 
         <section class="menu-content">
+
+            <button
+                class="menu-item"
+                type="button"
+                onclick="showScreen('login-screen')"
+            >
+
+                <div class="menu-item-left">
+
+                    <div class="menu-icon">
+                        <i data-lucide="user-round"></i>
+                    </div>
+
+                    <span>Login</span>
+
+                </div>
+
+                <i data-lucide="chevron-right"></i>
+
+            </button>
 
             <button
                 class="menu-item"
@@ -1267,6 +1368,7 @@
 <script src="js/voiceInput.js"></script>
 <script src="js/voiceCommands.js"></script>
 <script src="js/preferences.js"></script>
+<script src="js/auth.js"></script>
 
 <!-- App bootstrap - initializes all modules -->
 <script src="js/app.js"></script>
