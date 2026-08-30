@@ -165,7 +165,7 @@ async function sendChatMessage(message) {
 
 
     updateHandsFreeStatus(
-      "Thušo is thinking..."
+      "Thinking..."
     );
 
 

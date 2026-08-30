@@ -1,4 +1,17 @@
 // Hands-free voice command processing and execution
+
+// Single source of truth for the restart gap and the canonical status labels, so the
+// lifecycle (listening -> thinking -> speaking -> short delay -> listening) stays
+// consistent everywhere it's referenced.
+const HANDS_FREE_RESTART_DELAY_MS = 300;
+const HANDS_FREE_STATUS = {
+  LISTENING: "Listening...",
+  THINKING: "Thinking...",
+  SPEAKING: "Speaking...",
+  PAUSED: "Paused",
+  STOPPED: "Stopped",
+};
+
 function getCityFromVoiceCommand(command) {
   const cityMap = {
     polokwane: "Polokwane",
@@ -474,9 +487,8 @@ const HANDS_FREE_COMMANDS = [
     ],
     run: () => {
       APP_STATE.handsFreePaused = true;
-      const status = "Hands free paused. Say resume to continue.";
-      updateHandsFreeStatus(status);
-      speakText(status);
+      updateHandsFreeStatus(HANDS_FREE_STATUS.PAUSED);
+      speakText("Hands free paused. Say resume to continue.");
       return true;
     }
   },
@@ -487,9 +499,7 @@ const HANDS_FREE_COMMANDS = [
     ],
     run: () => {
       APP_STATE.handsFreePaused = false;
-      const status = "Hands free resumed.";
-      updateHandsFreeStatus(status);
-      speakText(status);
+      speakText("Hands free resumed.");
       return true;
     }
   },
@@ -557,7 +567,7 @@ function executeHandsFreeCommand(rawCommand) {
     APP_STATE.handsFreePaused &&
     !(classification.type === "ui_command" && HANDS_FREE_PAUSE_OVERRIDE_IDS.has(classification.definition.id))
   ) {
-    updateHandsFreeStatus("Hands free is paused. Say resume to continue.");
+    updateHandsFreeStatus(HANDS_FREE_STATUS.PAUSED);
     return true;
   }
 
@@ -566,7 +576,7 @@ function executeHandsFreeCommand(rawCommand) {
   }
 
   if (typeof sendChatMessage === "function") {
-    updateHandsFreeStatus("Sending your request to Thušo...");
+    updateHandsFreeStatus(HANDS_FREE_STATUS.THINKING);
     sendChatMessage(command);
     return true;
   }
@@ -599,7 +609,7 @@ function stopHandsFreeMode() {
     handsFreeButton.classList.remove("recording");
   }
 
-  updateHandsFreeStatus("Hands free mode off.");
+  updateHandsFreeStatus(HANDS_FREE_STATUS.STOPPED);
 }
 
 // Single gatekeeper for starting recognition again. Every trigger (recognition end,
@@ -626,8 +636,9 @@ function startHandsFreeListening() {
 }
 
 // Debounced: re-scheduling replaces any pending attempt instead of stacking timers,
-// which is what prevented duplicate automatic restarts.
-function resumeHandsFreeListening(delay = 300) {
+// which is what prevented duplicate automatic restarts. Defaults to the single shared
+// short delay (intentionally not zero) rather than each caller inventing its own gap.
+function resumeHandsFreeListening(delay = HANDS_FREE_RESTART_DELAY_MS) {
   if (APP_STATE.handsFreeListenTimer) {
     clearTimeout(APP_STATE.handsFreeListenTimer);
   }
@@ -666,7 +677,7 @@ function initialiseHandsFreeControls() {
     APP_STATE.handsFreeModeActive = true;
     APP_STATE.isHandsFreeListening = true;
     handsFreeButton.classList.add("recording");
-    updateHandsFreeStatus("Listening for voice commands...");
+    updateHandsFreeStatus(HANDS_FREE_STATUS.LISTENING);
   });
 
   APP_STATE.handsFreeRecognition.addEventListener("result", event => {
@@ -700,7 +711,7 @@ function initialiseHandsFreeControls() {
     // Recognition always ends after one utterance (continuous = false). If nothing
     // else is pending (speech, a chat request), this is what brings the mic back.
     if (APP_STATE.handsFreeModeActive) {
-      resumeHandsFreeListening(350);
+      resumeHandsFreeListening();
     }
   });
 
@@ -712,7 +723,7 @@ function initialiseHandsFreeControls() {
     }
 
     if (APP_STATE.handsFreeModeActive) {
-      resumeHandsFreeListening(350);
+      resumeHandsFreeListening();
     }
   });
 

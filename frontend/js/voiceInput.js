@@ -116,7 +116,7 @@ function speakText(text) {
 
   speech.addEventListener("start", () => {
     APP_STATE.isAssistantSpeaking = true;
-    updateHandsFreeStatus("Assistant speaking...");
+    updateHandsFreeStatus("Speaking...");
   });
 
   speech.addEventListener("end", () => {
@@ -127,7 +127,7 @@ function speakText(text) {
     }
 
     if (APP_STATE.handsFreeModeActive) {
-      resumeHandsFreeListening(300);
+      resumeHandsFreeListening();
     }
   });
 
@@ -135,7 +135,7 @@ function speakText(text) {
     APP_STATE.isAssistantSpeaking = false;
 
     if (APP_STATE.handsFreeModeActive) {
-      resumeHandsFreeListening(300);
+      resumeHandsFreeListening();
     }
   });
 
