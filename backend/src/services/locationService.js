@@ -341,7 +341,10 @@ const buildDocumentRequirementsResponse = (service, userGoal) => {
 
 const LOCATION_REFERENCE_PATTERNS = [
   { pattern: /\b(closest|nearest|nearby)\b/i, reference: "closest" },
-  { pattern: /\b(this one|that one|the first one|the second one|the last one)\b/i, reference: "selection" },
+  {
+    pattern: /\b(this one|that one|the first one|the second one|the last one|that facility|this facility|that place|this place|that location|this location)\b/i,
+    reference: "selection",
+  },
 ];
 
 // Deterministic fallback: picks up references to a facility mentioned earlier in the chat.
@@ -360,7 +363,7 @@ const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get|ta
 const FACILITY_DETAILS_PATTERN = /\b(opening hours|open until|contact number|phone number|address of|what time)\b/i;
 
 // Deterministic fallback used when Gemini is unavailable or doesn't return an intent.
-const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext, hasConfidentLocationMatch }) => {
+const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext, hasConfidentLocationMatch, mentionsServiceAndCityTogether }) => {
   if (isDocumentQuestion) {
     return "service_information";
   }
@@ -373,11 +376,22 @@ const detectIntent = (message, { hasService, isNewService, accessibilityNeed, lo
     return "directions";
   }
 
-  if (FACILITY_DETAILS_PATTERN.test(message) || hasConfidentLocationMatch) {
+  // Only treat this as "asking about one specific facility" when the message itself
+  // names the facility (service + city together, or "that one"/"that facility") -
+  // a city mentioned on its own while a service carries over from earlier should not
+  // force navigation into a details screen.
+  if (
+    FACILITY_DETAILS_PATTERN.test(message) ||
+    (mentionsServiceAndCityTogether && hasConfidentLocationMatch)
+  ) {
     return "facility_details";
   }
 
-  if (locationReference) {
+  if (locationReference === "selection") {
+    return "facility_details";
+  }
+
+  if (locationReference === "closest") {
     return "nearby_facilities";
   }
 

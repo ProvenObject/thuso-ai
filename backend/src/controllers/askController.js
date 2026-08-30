@@ -118,7 +118,8 @@ async function ask(req, res) {
 
   const service = detectedService || (state.service ? serviceByName(state.service) : null);
   const accessibilityNeed = detectAccessibilityNeed(message, aiIntent) || state.accessibilityNeed || null;
-  const city = detectCity(message, aiIntent) || state.city || null;
+  const detectedCity = detectCity(message, aiIntent);
+  const city = detectedCity || state.city || null;
 
   if (service) {
     state.service = service.name;
@@ -169,6 +170,10 @@ async function ask(req, res) {
   }
 
   const hasContext = Boolean(state.service || state.city || state.accessibilityNeed);
+  // Only counts as "naming a specific facility" when service and city are both stated
+  // in THIS message - a city mentioned alone while the service carries over from an
+  // earlier turn should just refresh the list, not jump into a details screen.
+  const mentionsServiceAndCityTogether = Boolean(detectedService) && Boolean(detectedCity);
   const intent = aiIntent?.intent || detectIntent(message, {
     hasService: Boolean(service),
     isNewService: serviceChanged,
@@ -177,6 +182,7 @@ async function ask(req, res) {
     isDocumentQuestion: isFollowUpDocumentQuestion,
     hasContext,
     hasConfidentLocationMatch,
+    mentionsServiceAndCityTogether,
   });
 
   const hasLocations = locations.length > 0 || Boolean(state.selectedLocation);
@@ -226,9 +232,8 @@ async function ask(req, res) {
     city,
     accessibilityNeed,
     locations,
-    cityMatches,
+    confidentLocation,
     state,
-    locationReference,
     needsClarification: clarification.needsClarification,
   });
 
@@ -249,7 +254,7 @@ async function ask(req, res) {
 // Maps the resolved intent onto the limited set of actions the current frontend can
 // actually perform (see navigation.js/locations.js/preferences.js). Never guesses a
 // target the data can't confidently support.
-function determineUiAction({ intent, message, service, city, accessibilityNeed, locations, cityMatches, state, locationReference, needsClarification }) {
+function determineUiAction({ intent, message, service, city, accessibilityNeed, locations, confidentLocation, state, needsClarification }) {
   if (needsClarification) {
     return { type: "none" };
   }
@@ -267,27 +272,15 @@ function determineUiAction({ intent, message, service, city, accessibilityNeed, 
   }
 
   if (intent === "facility_details") {
-    const confidentMatch = cityMatches.length === 1
-      ? cityMatches[0]
-      : (locations.length === 1 ? locations[0] : null);
-
-    if (confidentMatch) {
+    if (confidentLocation) {
       return {
         type: "show_location_details",
-        locationId: confidentMatch.id,
-        locationName: confidentMatch.name,
+        locationId: confidentLocation.id,
+        locationName: confidentLocation.name,
       };
     }
 
     return { type: "none" };
-  }
-
-  if (intent === "nearby_facilities" && locationReference === "selection" && state.selectedLocation) {
-    return {
-      type: "show_location_details",
-      locationId: state.selectedLocation.id,
-      locationName: state.selectedLocation.name,
-    };
   }
 
   if (intent === "accessibility_question" && service) {
