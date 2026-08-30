@@ -215,7 +215,8 @@ const HANDS_FREE_COMMANDS = [
   {
     id: "go_back",
     phrases: [
-      "go back", "previous screen", "back button", "go to previous screen", "take me back"
+      "go back", "previous screen", "back button", "go to previous screen", "take me back",
+      "go to the previous page", "previous page"
     ],
     run: () => {
       showScreen(APP_STATE.previousScreen || "home-screen");
@@ -259,7 +260,8 @@ const HANDS_FREE_COMMANDS = [
     phrases: [
       "open locations", "show locations", "accessible facilities", "find places",
       "show accessible places", "open accessible facilities", "show nearby places",
-      "open the locations screen", "show me locations", "find accessible locations"
+      "open the locations screen", "show me locations", "find accessible locations",
+      "open facilities", "show facilities"
     ],
     run: () => {
       showScreen("locations-screen");
@@ -407,7 +409,7 @@ const HANDS_FREE_COMMANDS = [
   {
     id: "read_aloud_on",
     phrases: [
-      "turn on read aloud", "enable read aloud", "activate read aloud", "read aloud on"
+      "turn on read aloud", "turn read aloud on", "enable read aloud", "activate read aloud", "read aloud on"
     ],
     run: () => {
       setReadAloudMode(true);
@@ -420,7 +422,7 @@ const HANDS_FREE_COMMANDS = [
   {
     id: "read_aloud_off",
     phrases: [
-      "turn off read aloud", "disable read aloud", "deactivate read aloud", "read aloud off"
+      "turn off read aloud", "turn read aloud off", "disable read aloud", "deactivate read aloud", "read aloud off"
     ],
     run: () => {
       setReadAloudMode(false);
@@ -446,7 +448,7 @@ const HANDS_FREE_COMMANDS = [
   {
     id: "repeat_last_response",
     phrases: [
-      "repeat that", "say that again", "repeat", "say again", "what did you say"
+      "repeat that", "say that again", "repeat", "say again", "what did you say", "read that again"
     ],
     run: () => {
       if (!APP_STATE.lastSpokenText) {
@@ -516,7 +518,7 @@ const HANDS_FREE_COMMANDS = [
     phrases: [
       "stop hands free", "exit hands free", "close hands free", "finish hands free",
       "deactivate hands free", "turn off hands free", "cancel hands free", "end voice mode",
-      "goodbye", "bye", "exit", "stop"
+      "goodbye", "bye", "exit", "stop", "stop listening", "end conversation"
     ],
     run: () => { stopHandsFreeMode(); return true; }
   },
