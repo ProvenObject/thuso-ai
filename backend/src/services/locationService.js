@@ -116,16 +116,23 @@ const detectCity = (message, aiIntent) => {
     return aiIntent.city;
   }
 
+  // Explicit, known speech-to-text variants of these town names (missing letters,
+  // dropped syllables, or a stray space). Not fuzzy/similarity matching - only the
+  // specific variants we expect from imperfect transcription are listed here.
   const cityAliases = {
     lebowakgmo: "Lebowakgomo",
     lebowakgomo: "Lebowakgomo",
+    lebowakomo: "Lebowakgomo",
+    "lebowa kgomo": "Lebowakgomo",
     polokwane: "Polokwane",
     seshego: "Seshego",
     mokopane: "Mokopane",
     tzaneen: "Tzaneen",
     giyani: "Giyani",
     thohoyandou: "Thohoyandou",
+    thoyandou: "Thohoyandou",
     "louis trichardt": "Louis Trichardt",
+    "louis trichard": "Louis Trichardt",
     musina: "Musina",
     burgersfort: "Burgersfort",
     "jane furse": "Jane Furse",

@@ -18,5 +18,6 @@ const APP_STATE = {
   handsFreeListenTimer: null,
   cameraStream: null,
   isOcrProcessing: false,
-  lastSpokenText: null
+  lastSpokenText: null,
+  preferredVoice: null
 };

@@ -87,6 +87,53 @@ function initialiseSpeechRecognition() {
   });
 }
 
+// ------------------------------------------------------------
+// TTS voice selection
+// ------------------------------------------------------------
+
+// Prefer an en-ZA voice; otherwise fall back to any English voice. Never assumes a
+// voice is installed - returns null if nothing suitable is available yet.
+function resolvePreferredVoice() {
+  if (!("speechSynthesis" in window)) {
+    return null;
+  }
+
+  const voices = window.speechSynthesis.getVoices();
+
+  if (!voices.length) {
+    return null;
+  }
+
+  const southAfricanEnglish = voices.find(voice => voice.lang && voice.lang.toLowerCase() === "en-za");
+
+  if (southAfricanEnglish) {
+    return southAfricanEnglish;
+  }
+
+  return voices.find(voice => voice.lang && voice.lang.toLowerCase().startsWith("en")) || null;
+}
+
+let hasRequestedVoiceList = false;
+
+// Voice lists often load asynchronously after page load, so we try immediately and
+// again once the browser reports they're ready - without attaching more than one
+// listener.
+function initialiseSpeechSynthesisVoice() {
+  if (!("speechSynthesis" in window) || APP_STATE.preferredVoice || hasRequestedVoiceList) {
+    return;
+  }
+
+  hasRequestedVoiceList = true;
+  APP_STATE.preferredVoice = resolvePreferredVoice();
+
+  if (!APP_STATE.preferredVoice) {
+    window.speechSynthesis.addEventListener("voiceschanged", function handleVoicesChanged() {
+      APP_STATE.preferredVoice = resolvePreferredVoice();
+      window.speechSynthesis.removeEventListener("voiceschanged", handleVoicesChanged);
+    });
+  }
+}
+
 function speakText(text) {
   if (!APP_STATE.voiceOutputEnabled) {
     return;
@@ -96,6 +143,8 @@ function speakText(text) {
     console.warn("Text-to-speech is not supported.");
     return;
   }
+
+  initialiseSpeechSynthesisVoice();
 
   if (APP_STATE.handsFreeModeActive && APP_STATE.handsFreeRecognition && APP_STATE.isHandsFreeListening) {
     try {
@@ -110,7 +159,16 @@ function speakText(text) {
   APP_STATE.lastSpokenText = text;
 
   const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "en-ZA";
+
+  // Use the actual matched voice when we have one; otherwise keep the en-ZA hint so
+  // the browser can still pick its closest available English voice.
+  if (APP_STATE.preferredVoice) {
+    speech.voice = APP_STATE.preferredVoice;
+    speech.lang = APP_STATE.preferredVoice.lang;
+  } else {
+    speech.lang = "en-ZA";
+  }
+
   speech.rate = 1;
   speech.pitch = 1;
 

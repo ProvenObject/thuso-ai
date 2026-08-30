@@ -74,6 +74,11 @@ Known cities:
 - Burgersfort
 - Jane Furse
 
+The message may come from speech-to-text and contain small transcription errors
+(missing or extra letters, a misplaced space). If the message clearly refers to one
+of the known cities above, return that city's exact spelling - do not invent a city
+that is not in this list.
+
 Allowed intent values:
 - find_service
 - find_facility
