@@ -73,6 +73,12 @@ function initialiseSpeechRecognition() {
       return;
     }
 
+    // Avoid the mic picking up Thušo's own voice.
+    if (APP_STATE.isAssistantSpeaking && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      APP_STATE.isAssistantSpeaking = false;
+    }
+
     try {
       APP_STATE.recognition.start();
     } catch (error) {

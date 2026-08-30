@@ -67,7 +67,7 @@ function setServiceFilterByName(filterName) {
 
   if (!target) return false;
 
-  const filterChip = [...document.querySelectorAll(".filter-chip")].find(chip => {
+  const filterChip = [...document.querySelectorAll("#service-filter-chips .filter-chip")].find(chip => {
     const value = (chip.dataset.filter || chip.textContent.trim()).toLowerCase();
 
     return value === target ||
@@ -77,7 +77,7 @@ function setServiceFilterByName(filterName) {
 
   if (!filterChip) return false;
 
-  document.querySelectorAll(".filter-chip").forEach(chip => {
+  document.querySelectorAll("#service-filter-chips .filter-chip").forEach(chip => {
     chip.classList.toggle("active", chip === filterChip);
   });
 
