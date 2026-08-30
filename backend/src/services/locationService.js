@@ -342,7 +342,7 @@ const buildDocumentRequirementsResponse = (service, userGoal) => {
 const LOCATION_REFERENCE_PATTERNS = [
   { pattern: /\b(closest|nearest|nearby)\b/i, reference: "closest" },
   {
-    pattern: /\b(this one|that one|the first one|the second one|the last one|that facility|this facility|that place|this place|that location|this location)\b/i,
+    pattern: /\b(this one|that one|the first one|the second one|the last one|that facility|this facility|that place|this place|that location|this location|the one(?!\s+(thing|reason|way|issue|problem)))\b/i,
     reference: "selection",
   },
 ];
@@ -356,6 +356,55 @@ const detectLocationReference = (message) => {
   }
 
   return null;
+};
+
+// Resolves "the" facility being discussed from service + city + any explicit reference,
+// without ever guessing across multiple possible matches.
+// - exactly one match for the stated city (or exactly one location overall) -> confident.
+// - an explicit "that one"/"the one" style reference can point back at the facility
+//   already selected, but only if one is actually selected.
+// - anything else that resolves to more than one candidate is reported as ambiguous so
+//   the caller can ask for clarification instead of picking one.
+const resolveFacilitySelection = ({ service, city, locations, locationReference, selectedLocation }) => {
+  if (!service) {
+    return { location: null, isAmbiguous: false, candidates: [] };
+  }
+
+  const cityMatches = city
+    ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
+    : [];
+
+  if (cityMatches.length === 1) {
+    return { location: cityMatches[0], isAmbiguous: false, candidates: cityMatches };
+  }
+
+  if (cityMatches.length > 1) {
+    return { location: null, isAmbiguous: true, candidates: cityMatches };
+  }
+
+  if (locations.length === 1) {
+    return { location: locations[0], isAmbiguous: false, candidates: locations };
+  }
+
+  if (locationReference === "selection" && selectedLocation) {
+    return { location: selectedLocation, isAmbiguous: false, candidates: [selectedLocation] };
+  }
+
+  if (locations.length > 1) {
+    return { location: null, isAmbiguous: true, candidates: locations };
+  }
+
+  return { location: null, isAmbiguous: false, candidates: [] };
+};
+
+// Lists the towns involved so the clarification question is actually answerable.
+const buildFacilitySelectionClarification = (service, city, candidates) => {
+  const cityNames = [...new Set(candidates.map((candidate) => candidate.city).filter(Boolean))];
+  const placeText = cityNames.length > 1
+    ? ` in places like ${cityNames.slice(0, 3).join(", ")}`
+    : (city ? ` in ${city}` : "");
+
+  return `There are ${candidates.length} ${service.name} offices${placeText}. Which one do you mean, for example by town?`;
 };
 
 const UI_COMMAND_PATTERN = /\b(open|enable|turn on|turn off|zoom in|zoom out|show me the map|start voice|open camera)\b/i;
@@ -451,6 +500,8 @@ module.exports = {
   detectUserGoal,
   isDocumentRequirementQuestion,
   detectLocationReference,
+  resolveFacilitySelection,
+  buildFacilitySelectionClarification,
   detectIntent,
   detectClarification,
   buildServiceLocations,

@@ -7,6 +7,8 @@ const {
   detectUserGoal,
   isDocumentRequirementQuestion,
   detectLocationReference,
+  resolveFacilitySelection,
+  buildFacilitySelectionClarification,
   detectIntent,
   detectClarification,
   buildServiceLocations,
@@ -155,18 +157,24 @@ async function ask(req, res) {
   }
 
   // A single location for the stated city (or the only location overall) is confident
-  // enough to treat as "the" facility the user is now asking about.
-  const cityMatches = city
-    ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
-    : [];
-  const confidentLocation = cityMatches.length === 1
-    ? cityMatches[0]
-    : (locations.length === 1 ? locations[0] : state.selectedLocation);
+  // enough to treat as "the" facility the user is now asking about. When more than one
+  // facility could match, we never guess - selectedLocation stays untouched/cleared and
+  // the response asks the user to narrow it down instead.
+  const facilitySelection = resolveFacilitySelection({
+    service,
+    city,
+    locations,
+    locationReference,
+    selectedLocation: state.selectedLocation,
+  });
+  const confidentLocation = facilitySelection.location;
   const hasConfidentLocationMatch = Boolean(confidentLocation);
 
-  if (cityMatches.length === 1 || locations.length === 1) {
-    const onlyMatch = cityMatches.length === 1 ? cityMatches[0] : locations[0];
-    state.selectedLocation = { id: onlyMatch.id, name: onlyMatch.name, city: onlyMatch.city || null };
+  if (confidentLocation) {
+    state.selectedLocation = { id: confidentLocation.id, name: confidentLocation.name, city: confidentLocation.city || null };
+  } else if (facilitySelection.isAmbiguous) {
+    // A stale selection from an earlier, unrelated match must not be reused as a guess.
+    state.selectedLocation = null;
   }
 
   const hasContext = Boolean(state.service || state.city || state.accessibilityNeed);
@@ -186,9 +194,18 @@ async function ask(req, res) {
   });
 
   const hasLocations = locations.length > 0 || Boolean(state.selectedLocation);
-  const clarification = aiIntent && typeof aiIntent.needsClarification === "boolean"
+  let clarification = aiIntent && typeof aiIntent.needsClarification === "boolean"
     ? { needsClarification: aiIntent.needsClarification, clarificationQuestion: aiIntent.clarificationQuestion || null }
     : detectClarification({ intent, service, locationReference, hasLocations });
+
+  // The user asked about one specific facility, but more than one could match it -
+  // ask which one instead of silently picking (or keeping) a guess.
+  if (!clarification.needsClarification && facilitySelection.isAmbiguous && intent === "facility_details") {
+    clarification = {
+      needsClarification: true,
+      clarificationQuestion: buildFacilitySelectionClarification(service, city, facilitySelection.candidates),
+    };
+  }
 
   let response;
 
