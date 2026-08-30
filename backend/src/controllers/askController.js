@@ -119,7 +119,8 @@ async function ask(req, res) {
   const serviceChanged = Boolean(detectedService) && state.service !== detectedService.name;
 
   const service = detectedService || (state.service ? serviceByName(state.service) : null);
-  const accessibilityNeed = detectAccessibilityNeed(message, aiIntent) || state.accessibilityNeed || null;
+  const detectedAccessibilityNeed = detectAccessibilityNeed(message, aiIntent);
+  const accessibilityNeed = detectedAccessibilityNeed || state.accessibilityNeed || null;
   const detectedCity = detectCity(message, aiIntent);
   const city = detectedCity || state.city || null;
 
@@ -254,6 +255,32 @@ async function ask(req, res) {
     needsClarification: clarification.needsClarification,
   });
 
+  // Only worth presenting a facility list when the user is genuinely finding/searching,
+  // or when a new filter this turn produced results worth showing. Follow-up questions
+  // about an already-selected facility (accessibility, directions, details, documents)
+  // get answered directly instead of repeating the whole list.
+  const LOCATION_LIST_INTENTS = new Set(["find_service", "find_facility"]);
+  const isBroaderAccessibilityFilter = intent === "accessibility_question" && !confidentLocation;
+  const shouldReturnLocations = !clarification.needsClarification
+    && Boolean(service)
+    && locations.length > 0
+    && (LOCATION_LIST_INTENTS.has(intent) || isBroaderAccessibilityFilter);
+
+  let responseLocations = [];
+
+  if (shouldReturnLocations) {
+    const cityFilteredLocations = city
+      ? locations.filter((location) => location.city && location.city.toLowerCase() === city.toLowerCase())
+      : [];
+    const accessibilityFilteredLocations = accessibilityNeed
+      ? locations.filter((location) => location.accessibilityMatch)
+      : [];
+
+    responseLocations = cityFilteredLocations.length > 0
+      ? cityFilteredLocations
+      : (accessibilityFilteredLocations.length > 0 ? accessibilityFilteredLocations : locations);
+  }
+
   console.log("Conversation state:", { conversationId, state });
 
   return res.json(
@@ -262,7 +289,7 @@ async function ask(req, res) {
       conversationId,
       state,
       service,
-      locations,
+      locations: responseLocations,
       action,
     })
   );
