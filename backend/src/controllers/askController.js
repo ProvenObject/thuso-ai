@@ -212,6 +212,11 @@ async function ask(req, res) {
 
   if (clarification.needsClarification && clarification.clarificationQuestion) {
     response = clarification.clarificationQuestion;
+  } else if (intent === "directions") {
+    // Never guess a destination - only confirm directions when a facility is already selected.
+    response = state.selectedLocation
+      ? `Opening directions to the ${service ? `${service.name} office` : "facility"}${state.selectedLocation.city ? ` in ${state.selectedLocation.city}` : ""}.`
+      : "I can give you directions, but first I need to know which facility you'd like to visit.";
   } else if (intent === "nearby_facilities" && locationReference) {
     response = buildNearbyFacilitiesResponse(locations.length > 0 ? locations : (state.selectedLocation ? [state.selectedLocation] : []), state.city);
   } else if (isFollowUpDocumentQuestion || intent === "service_information") {

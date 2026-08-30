@@ -407,9 +407,9 @@ const buildFacilitySelectionClarification = (service, city, candidates) => {
   return `There are ${candidates.length} ${service.name} offices${placeText}. Which one do you mean, for example by town?`;
 };
 
-const UI_COMMAND_PATTERN = /\b(open|enable|turn on|turn off|zoom in|zoom out|show me the map|start voice|open camera)\b/i;
-const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get|take me there|take me to)\b/i;
-const FACILITY_DETAILS_PATTERN = /\b(opening hours|open until|contact number|phone number|address of|what time)\b/i;
+const UI_COMMAND_PATTERN = /\b(open|enable|turn on|turn off|zoom in|zoom out|start voice|open camera)\b/i;
+const DIRECTIONS_PATTERN = /\b(directions|how do i get there|route|way to get|take me there|take me to|show me on the map|show on the map|open the map|view on the map|show me the map)\b/i;
+const FACILITY_DETAILS_PATTERN = /\b(opening hours|open until|contact number|phone number|address of|what time|show me the details|show the details|show details|more details|facility details)\b/i;
 
 // Deterministic fallback used when Gemini is unavailable or doesn't return an intent.
 const detectIntent = (message, { hasService, isNewService, accessibilityNeed, locationReference, isDocumentQuestion, hasContext, hasConfidentLocationMatch, mentionsServiceAndCityTogether }) => {
@@ -417,10 +417,9 @@ const detectIntent = (message, { hasService, isNewService, accessibilityNeed, lo
     return "service_information";
   }
 
-  if (UI_COMMAND_PATTERN.test(message)) {
-    return "ui_command";
-  }
-
+  // Checked before the generic UI_COMMAND_PATTERN: bare words like "open" would
+  // otherwise swallow "open directions"/"open the map"/"open that facility" before
+  // they're recognised as facility-specific requests.
   if (DIRECTIONS_PATTERN.test(message)) {
     return "directions";
   }
@@ -442,6 +441,10 @@ const detectIntent = (message, { hasService, isNewService, accessibilityNeed, lo
 
   if (locationReference === "closest") {
     return "nearby_facilities";
+  }
+
+  if (UI_COMMAND_PATTERN.test(message)) {
+    return "ui_command";
   }
 
   if (accessibilityNeed && !isNewService) {
