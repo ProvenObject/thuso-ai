@@ -1,5 +1,38 @@
-// Accessibility preferences and settings
-function setHighContrastMode(enabled) {
+const ACCESSIBILITY_STORAGE_KEY = "thuso-accessibility-preferences";
+
+function getAccessibilityPreferenceSnapshot() {
+  return {
+    highContrastEnabled: APP_STATE.highContrastEnabled,
+    readAloudEnabled: APP_STATE.readAloudEnabled,
+    voiceOutputEnabled: APP_STATE.voiceOutputEnabled,
+    mobilityPreferenceEnabled: APP_STATE.mobilityPreferenceEnabled,
+    appLanguage: APP_STATE.appLanguage,
+    textSize: APP_STATE.textSize,
+    accessibilityProfile: {
+      lowVision: document.querySelectorAll(".preference-chip")[0]?.classList.contains("selected") || false,
+      blind: document.querySelectorAll(".preference-chip")[1]?.classList.contains("selected") || false,
+      deaf: document.querySelectorAll(".preference-chip")[2]?.classList.contains("selected") || false,
+      mobility: document.querySelectorAll(".preference-chip")[3]?.classList.contains("selected") || false
+    }
+  };
+}
+
+function persistAccessibilityPreferences() {
+  localStorage.setItem(ACCESSIBILITY_STORAGE_KEY, JSON.stringify(getAccessibilityPreferenceSnapshot()));
+
+  if (APP_STATE.authUser && typeof persistCurrentAuthProfile === "function") {
+    persistCurrentAuthProfile();
+  }
+}
+
+function syncPreferenceChips(profile = {}) {
+  const preferenceMap = ["lowVision", "blind", "deaf", "mobility"];
+  document.querySelectorAll(".preference-chip").forEach((chip, index) => {
+    chip.classList.toggle("selected", profile[preferenceMap[index]] === true);
+  });
+}
+
+function setHighContrastMode(enabled, { announce = true, persist = true } = {}) {
   const isEnabled = !!enabled;
 
   APP_STATE.highContrastEnabled = isEnabled;
@@ -10,16 +43,18 @@ function setHighContrastMode(enabled) {
   contrastToggle?.classList.toggle("active", isEnabled);
   contrastToggle?.setAttribute("aria-pressed", String(isEnabled));
 
-  const status = isEnabled ? "High contrast enabled." : "High contrast disabled.";
-  updateHandsFreeStatus(status);
-  speakText(status);
+  if (announce) {
+    const status = isEnabled ? "High contrast enabled." : "High contrast disabled.";
+    updateHandsFreeStatus(status);
+    speakText(status);
+  }
 
-  if (APP_STATE.authUser) {
-    persistCurrentAuthProfile();
+  if (persist) {
+    persistAccessibilityPreferences();
   }
 }
 
-function setReadAloudMode(enabled) {
+function setReadAloudMode(enabled, { persist = true } = {}) {
   APP_STATE.readAloudEnabled = !!enabled;
 
   const readAloudToggle = document.getElementById("read-aloud-toggle");
@@ -28,6 +63,30 @@ function setReadAloudMode(enabled) {
 
   if (APP_STATE.readAloudEnabled) {
     APP_STATE.voiceOutputEnabled = true;
+  }
+
+  if (persist) {
+    persistAccessibilityPreferences();
+  }
+}
+
+function setVoiceOutputMode(enabled, { announce = true, persist = true } = {}) {
+  APP_STATE.voiceOutputEnabled = !!enabled;
+
+  const voiceToggle = document.querySelector('.toggle:not(#high-contrast-toggle):not(#read-aloud-toggle)');
+  voiceToggle?.classList.toggle("active", APP_STATE.voiceOutputEnabled);
+  voiceToggle?.setAttribute("aria-pressed", String(APP_STATE.voiceOutputEnabled));
+
+  if (!APP_STATE.voiceOutputEnabled) {
+    setReadAloudMode(false, { persist: false });
+  }
+
+  if (announce) {
+    updateHandsFreeStatus(APP_STATE.voiceOutputEnabled ? "Voice responses enabled." : "Voice responses disabled.");
+  }
+
+  if (persist) {
+    persistAccessibilityPreferences();
   }
 }
 
@@ -42,20 +101,68 @@ function speakButtonLabel(button) {
   }
 }
 
-function changeTextSize(delta) {
+function setTextSize(value, { announce = true, persist = true } = {}) {
   const textSizeInput = document.getElementById("text-size");
-  const currentValue = Number(textSizeInput?.value || 16);
-  const nextValue = Math.min(22, Math.max(14, currentValue + delta));
+  const nextValue = Math.min(22, Math.max(14, Number(value) || 16));
 
   document.documentElement.style.fontSize = `${nextValue}px`;
+  document.documentElement.style.setProperty("--text-scale", String(nextValue / 16));
+  APP_STATE.textSize = nextValue;
 
   if (textSizeInput) {
     textSizeInput.value = String(nextValue);
   }
 
-  const status = `Text size set to ${nextValue}px.`;
-  updateHandsFreeStatus(status);
-  speakText(status);
+  if (announce) {
+    const sizeLabel = nextValue <= 14 ? "Small" : nextValue <= 16 ? "Normal" : nextValue <= 19 ? "Large" : "Extra large";
+    const status = `Text size set to ${sizeLabel}.`;
+    updateHandsFreeStatus(status);
+    speakText(status);
+  }
+
+  if (persist) {
+    persistAccessibilityPreferences();
+  }
+}
+
+function changeTextSize(delta) {
+  setTextSize(APP_STATE.textSize + delta);
+}
+
+function setMobilityPreference(enabled, { announce = true, persist = true } = {}) {
+  APP_STATE.mobilityPreferenceEnabled = !!enabled;
+  const mobilityChip = [...document.querySelectorAll(".preference-chip")]
+    .find(chip => chip.textContent.toLowerCase().includes("mobility"));
+  mobilityChip?.classList.toggle("selected", APP_STATE.mobilityPreferenceEnabled);
+  syncLocationRecommendations();
+  applyLocationFilters();
+
+  if (announce) {
+    const status = APP_STATE.mobilityPreferenceEnabled ? "Mobility preference enabled." : "Mobility preference disabled.";
+    updateHandsFreeStatus(status);
+    speakText(status);
+  }
+
+  if (persist) {
+    persistAccessibilityPreferences();
+  }
+}
+
+function restoreAccessibilityPreferences() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ACCESSIBILITY_STORAGE_KEY) || "null");
+    if (!stored || typeof stored !== "object") return;
+
+    setHighContrastMode(stored.highContrastEnabled === true, { announce: false, persist: false });
+    setReadAloudMode(stored.readAloudEnabled === true, { persist: false });
+    setVoiceOutputMode(stored.voiceOutputEnabled !== false, { announce: false, persist: false });
+    applyLanguagePreference(stored.appLanguage || "en", { announce: false, persist: false });
+    setTextSize(stored.textSize, { announce: false, persist: false });
+    syncPreferenceChips(stored.accessibilityProfile);
+    setMobilityPreference(stored.mobilityPreferenceEnabled === true, { announce: false, persist: false });
+  } catch (error) {
+    console.warn("Unable to restore accessibility preferences:", error);
+  }
 }
 
 function updateLocationCardDistances() {
@@ -146,7 +253,7 @@ function requestCurrentLocation(force = false) {
   );
 }
 
-function applyLanguagePreference(languageCode = APP_STATE.appLanguage) {
+function applyLanguagePreference(languageCode = APP_STATE.appLanguage, { announce = true, persist = true } = {}) {
   const language = String(languageCode || "en").toLowerCase();
   APP_STATE.appLanguage = language;
 
@@ -161,11 +268,17 @@ function applyLanguagePreference(languageCode = APP_STATE.appLanguage) {
     refreshSpeechSynthesisVoice();
   }
 
-  const status = `Language set to ${language.toUpperCase()}.`;
-  updateHandsFreeStatus(status);
+  if (announce) {
+    const status = `Language set to ${language.toUpperCase()}.`;
+    updateHandsFreeStatus(status);
 
-  if (APP_STATE.voiceOutputEnabled) {
-    speakText(status);
+    if (APP_STATE.voiceOutputEnabled) {
+      speakText(status);
+    }
+  }
+
+  if (persist) {
+    persistAccessibilityPreferences();
   }
 }
 
@@ -182,24 +295,20 @@ function applyAccessibilityPreference(chip) {
 
   if (chipText.includes("blind")) {
     setHighContrastMode(true);
-    APP_STATE.voiceOutputEnabled = true;
-    const toggle = document.querySelector(".toggle.active");
-    if (toggle) {
-      toggle.classList.add("active");
-    }
+    setVoiceOutputMode(true, { announce: false });
     speakText("Blind mode enabled.");
     return;
   }
 
   if (chipText.includes("deaf")) {
-    APP_STATE.voiceOutputEnabled = false;
+    setVoiceOutputMode(false, { announce: false });
     const status = "Voice responses turned off for deaf mode.";
     updateHandsFreeStatus(status);
     return;
   }
 
   if (chipText.includes("mobility")) {
-    APP_STATE.mobilityPreferenceEnabled = true;
+    setMobilityPreference(true, { announce: false });
     showScreen("locations-screen");
     setLocationFilterByName("all");
     applyLocationFilters();

@@ -84,12 +84,6 @@
 
         </header>
 
-        <div class="hands-free-status-bar" aria-live="polite">
-            <span class="status-dot"></span>
-            <span id="hands-free-status">Hands free ready.</span>
-        </div>
-
-
         <section class="home-content">
 
             <div class="welcome-section">
@@ -236,6 +230,11 @@
         </section>
 
     </main>
+
+    <div class="hands-free-status-bar" role="status" aria-live="polite" aria-atomic="true">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="hands-free-status">Hands free ready.</span>
+    </div>
 
 
 

@@ -68,84 +68,20 @@ function clearAuthProfile() {
 function applyAuthProfileToApp(profile) {
   if (!profile || typeof profile !== "object") return;
 
-  if (typeof profile.readAloudEnabled === "boolean") {
-    setReadAloudMode(profile.readAloudEnabled);
-  }
-
-  if (typeof profile.voiceOutputEnabled === "boolean") {
-    APP_STATE.voiceOutputEnabled = profile.voiceOutputEnabled;
-  }
-
-  if (typeof profile.mobilityPreferenceEnabled === "boolean") {
-    APP_STATE.mobilityPreferenceEnabled = profile.mobilityPreferenceEnabled;
-  }
-
-  if (typeof profile.appLanguage === "string" && profile.appLanguage) {
-    applyLanguagePreference(profile.appLanguage);
-  }
-
-  if (typeof profile.highContrastEnabled === "boolean") {
-    setHighContrastMode(profile.highContrastEnabled);
-  }
-
-  if (Number.isFinite(Number(profile.textSize))) {
-    document.documentElement.style.fontSize = `${Number(profile.textSize)}px`;
-    const textSizeInput = document.getElementById("text-size");
-    if (textSizeInput) {
-      textSizeInput.value = String(Number(profile.textSize));
-    }
-  }
-
-  if (profile.accessibilityProfile) {
-    const preferenceMap = {
-      lowVision: "Low Vision",
-      blind: "Blind",
-      deaf: "Deaf",
-      mobility: "Mobility"
-    };
-
-    document.querySelectorAll(".preference-chip").forEach(chip => {
-      const text = chip.textContent.trim();
-      const key = Object.keys(preferenceMap).find(item => preferenceMap[item] === text || text.toLowerCase().includes(preferenceMap[item].toLowerCase()));
-
-      if (!key) return;
-
-      const selected = !!profile.accessibilityProfile[key];
-      chip.classList.toggle("selected", selected);
-
-      if (key === "mobility" && selected) {
-        APP_STATE.mobilityPreferenceEnabled = true;
-      }
-    });
-  }
-
-  const voiceToggle = document.querySelector('.toggle:not(#high-contrast-toggle):not(#read-aloud-toggle)');
-  if (voiceToggle) {
-    voiceToggle.classList.toggle("active", APP_STATE.voiceOutputEnabled);
-  }
-
-  const contrastToggle = document.getElementById("high-contrast-toggle");
-  if (contrastToggle) {
-    contrastToggle.classList.toggle("active", !!document.body.classList.contains("high-contrast-mode"));
-    contrastToggle.setAttribute("aria-pressed", String(document.body.classList.contains("high-contrast-mode")));
-  }
-
-  const readAloudToggle = document.getElementById("read-aloud-toggle");
-  if (readAloudToggle) {
-    readAloudToggle.classList.toggle("active", !!APP_STATE.readAloudEnabled);
-    readAloudToggle.setAttribute("aria-pressed", String(!!APP_STATE.readAloudEnabled));
-  }
+  setReadAloudMode(profile.readAloudEnabled === true, { persist: false });
+  setVoiceOutputMode(profile.voiceOutputEnabled !== false, { announce: false, persist: false });
+  applyLanguagePreference(profile.appLanguage || "en", { announce: false, persist: false });
+  setHighContrastMode(profile.highContrastEnabled === true, { announce: false, persist: false });
+  setTextSize(profile.textSize, { announce: false, persist: false });
+  syncPreferenceChips(profile.accessibilityProfile);
+  setMobilityPreference(profile.mobilityPreferenceEnabled === true, { announce: false, persist: false });
 
   const languageSelect = document.getElementById("language-select");
   if (languageSelect) {
     languageSelect.value = APP_STATE.appLanguage || "en";
   }
 
-  if (APP_STATE.mobilityPreferenceEnabled) {
-    showScreen("locations-screen");
-    setLocationFilterByName("all");
-    applyLocationFilters();
-  }
+  persistAccessibilityPreferences();
 }
 
 function persistCurrentAuthProfile() {
@@ -250,37 +186,18 @@ function logoutDemoUser() {
   updateAuthStatusUI();
 
   const defaultLanguage = "en";
-  APP_STATE.readAloudEnabled = false;
-  APP_STATE.voiceOutputEnabled = true;
-  APP_STATE.mobilityPreferenceEnabled = false;
-  applyLanguagePreference(defaultLanguage);
-  setHighContrastMode(false);
-  document.documentElement.style.fontSize = "16px";
-  const textSizeInput = document.getElementById("text-size");
-  if (textSizeInput) {
-    textSizeInput.value = "16";
-  }
+  setReadAloudMode(false, { persist: false });
+  setVoiceOutputMode(true, { announce: false, persist: false });
+  setMobilityPreference(false, { announce: false, persist: false });
+  applyLanguagePreference(defaultLanguage, { announce: false, persist: false });
+  setHighContrastMode(false, { announce: false, persist: false });
+  setTextSize(16, { announce: false, persist: false });
 
   document.querySelectorAll(".preference-chip").forEach(chip => {
     chip.classList.remove("selected");
   });
 
-  const voiceToggle = document.querySelector('.toggle:not(#high-contrast-toggle):not(#read-aloud-toggle)');
-  if (voiceToggle) {
-    voiceToggle.classList.add("active");
-  }
-
-  const readAloudToggle = document.getElementById("read-aloud-toggle");
-  if (readAloudToggle) {
-    readAloudToggle.classList.remove("active");
-    readAloudToggle.setAttribute("aria-pressed", "false");
-  }
-
-  const contrastToggle = document.getElementById("high-contrast-toggle");
-  if (contrastToggle) {
-    contrastToggle.classList.remove("active");
-    contrastToggle.setAttribute("aria-pressed", "false");
-  }
+  persistAccessibilityPreferences();
 
   showScreen("home-screen");
 }

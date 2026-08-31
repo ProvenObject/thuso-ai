@@ -542,6 +542,7 @@ const HANDS_FREE_COMMANDS = [
 
       APP_STATE.handsFreeModeActive = true;
       APP_STATE.handsFreePaused = false;
+      document.body.classList.add("hands-free-active");
       const status = "Hands free mode started. Say a command.";
       updateHandsFreeStatus(status);
       speakText(status);
@@ -717,6 +718,7 @@ function executeHandsFreeCommand(rawCommand) {
 function stopHandsFreeMode() {
   APP_STATE.handsFreeModeActive = false;
   APP_STATE.handsFreePaused = false;
+  document.body.classList.remove("hands-free-active");
 
   if (APP_STATE.handsFreeListenTimer) {
     clearTimeout(APP_STATE.handsFreeListenTimer);
@@ -806,6 +808,7 @@ function initialiseHandsFreeControls() {
   APP_STATE.handsFreeRecognition.addEventListener("start", () => {
     APP_STATE.handsFreeModeActive = true;
     APP_STATE.isHandsFreeListening = true;
+    document.body.classList.add("hands-free-active");
     handsFreeButton.classList.add("recording");
     updateHandsFreeStatus(HANDS_FREE_STATUS.LISTENING);
   });
@@ -871,6 +874,7 @@ function initialiseHandsFreeControls() {
 
     APP_STATE.handsFreeModeActive = true;
     APP_STATE.handsFreePaused = false;
+    document.body.classList.add("hands-free-active");
     updateHandsFreeStatus("Hands free mode started. Say a command.");
     speakText("Hands free mode started. Say a command.");
     // Safety net in case voice output is disabled and no TTS "end" event ever fires.

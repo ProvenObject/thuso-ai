@@ -128,6 +128,7 @@ function renderLocations(locations, serviceName = "") {
         <h3>${escapeHtml(location.name)}</h3>
         <p>${escapeHtml(location.address || "Address unavailable")}</p>
         <p class="location-distance" hidden>Distance unavailable</p>
+        <p class="location-recommendation" hidden>Recommended for your mobility preference</p>
       </div>
       ${createIcon("chevron-right")}
     `;
@@ -140,7 +141,19 @@ function renderLocations(locations, serviceName = "") {
   });
 
   refreshIcons();
+  syncLocationRecommendations();
   updateLocationCardDistances();
+}
+
+function syncLocationRecommendations() {
+  document.querySelectorAll("#locations-list .location-card").forEach(card => {
+    const recommended = APP_STATE.mobilityPreferenceEnabled && card.dataset.wheelchairAccessible === "true";
+    card.classList.toggle("recommended-location", recommended);
+    const label = card.querySelector(".location-recommendation");
+    if (label) {
+      label.hidden = !recommended;
+    }
+  });
 }
 
 async function loadLocationDetails(locationId, fromScreen = "locations-screen") {

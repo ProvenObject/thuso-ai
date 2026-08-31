@@ -58,8 +58,9 @@ function initialisePreferences() {
       if (chip.classList.contains("selected")) {
         applyAccessibilityPreference(chip);
       } else if (chip.textContent.toLowerCase().includes("mobility")) {
-        APP_STATE.mobilityPreferenceEnabled = false;
-        applyLocationFilters();
+        setMobilityPreference(false);
+      } else {
+        persistAccessibilityPreferences();
       }
     });
   });
@@ -93,16 +94,7 @@ function initialisePreferences() {
       const settingText = toggle.closest(".setting-row")?.innerText?.toLowerCase();
 
       if (settingText?.includes("voice responses")) {
-        APP_STATE.voiceOutputEnabled = toggle.classList.contains("active");
-        if (!APP_STATE.voiceOutputEnabled) {
-          setReadAloudMode(false);
-        }
-        const status = APP_STATE.voiceOutputEnabled ? "Voice responses enabled." : "Voice responses disabled.";
-        updateHandsFreeStatus(status);
-
-        if (APP_STATE.voiceOutputEnabled) {
-          speakText(status);
-        }
+        setVoiceOutputMode(toggle.classList.contains("active"));
       }
     });
   });
@@ -118,7 +110,7 @@ function initialisePreferences() {
   const textSize = document.getElementById("text-size");
   if (textSize) {
     textSize.addEventListener("input", event => {
-      document.documentElement.style.fontSize = `${event.target.value}px`;
+      setTextSize(event.target.value, { announce: false });
     });
   }
 }

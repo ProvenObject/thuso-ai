@@ -8,6 +8,7 @@ const APP_STATE = {
   highContrastEnabled: false,
   mobilityPreferenceEnabled: false,
   appLanguage: "en",
+  textSize: 16,
   authUser: null,
   currentUserPosition: {
     latitude: null,
