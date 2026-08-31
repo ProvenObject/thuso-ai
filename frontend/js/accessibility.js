@@ -209,7 +209,12 @@ function updateLocationCardDistances() {
 }
 
 function requestCurrentLocation(force = false) {
-  if (!navigator.geolocation) return;
+  if (!navigator.geolocation) {
+    APP_STATE.currentUserPosition = { latitude: null, longitude: null, accuracy: null };
+    updateHandsFreeStatus("Location unavailable. You can still search by town.");
+    updateLocationCardDistances();
+    return;
+  }
 
   const hasValidPosition = APP_STATE.currentUserPosition &&
     Number.isFinite(APP_STATE.currentUserPosition.latitude) &&
@@ -246,7 +251,11 @@ function requestCurrentLocation(force = false) {
         longitude: null,
         accuracy: null
       };
+      const locationMessage = error.code === error.PERMISSION_DENIED
+        ? "Location permission was not granted. You can still search by town."
+        : "Location unavailable. You can still search by town.";
       console.info("Current location is unavailable:", error.message);
+      updateHandsFreeStatus(locationMessage);
       updateLocationCardDistances();
     },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }

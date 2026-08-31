@@ -41,8 +41,9 @@ function initialiseSpeechRecognition() {
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    voiceButton.style.display = "none";
-    console.warn("Speech recognition is not supported in this browser.");
+    voiceButton.disabled = true;
+    voiceButton.title = "Speech input is unavailable in this browser. You can still type your message.";
+    voiceButton.setAttribute("aria-label", "Speech input unavailable. Type your message instead.");
     return;
   }
 
@@ -98,6 +99,13 @@ function initialiseSpeechRecognition() {
 
     if (event.error === "language-not-supported") {
       updateHandsFreeStatus("The selected speech recognition language is not supported by this browser. Please choose another language or type your message.");
+      return;
+    }
+
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      const microphoneMessage = "Microphone permission was not granted. You can still type your message.";
+      addChatMessage(microphoneMessage, "assistant")?.classList.add("unavailable-message");
+      updateHandsFreeStatus(microphoneMessage);
       return;
     }
 

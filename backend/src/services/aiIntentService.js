@@ -2,11 +2,13 @@ const { GoogleGenAI } = require("@google/genai");
 const { GEMINI_API_KEY } = require("../../config");
 
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+let aiServiceAvailable = Boolean(ai);
 
 // context carries the previous conversation state so Gemini can resolve references
 // like "which one is closest" without us re-explaining the whole history.
 async function getAiIntent(rawMessage, context = {}) {
   if (!ai) {
+    aiServiceAvailable = false;
     return null;
   }
 
@@ -123,6 +125,8 @@ User message:
     const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const parsed = JSON.parse(cleanedText);
 
+    aiServiceAvailable = true;
+
     return {
       service: parsed.service || null,
       userGoal: parsed.userGoal || null,
@@ -134,6 +138,7 @@ User message:
       clarificationQuestion: parsed.clarificationQuestion || null,
     };
   } catch (error) {
+    aiServiceAvailable = false;
     console.error("Gemini understanding error:", error.message);
     return null;
   }
@@ -142,4 +147,5 @@ User message:
 module.exports = {
   ai,
   getAiIntent,
+  isAiServiceAvailable: () => aiServiceAvailable,
 };

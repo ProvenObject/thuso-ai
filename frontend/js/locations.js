@@ -1,7 +1,14 @@
 // Location loading, filtering, and details
 async function attachAccessibilityData(locations) {
   const API_URL = window.APP_CONFIG?.API_URL || "";
-  const accessibilityRecords = await fetchJson(`${API_URL}/api/accessibility`);
+  let accessibilityRecords = [];
+
+  try {
+    accessibilityRecords = await fetchJson(`${API_URL}/api/accessibility`);
+  } catch (error) {
+    console.warn("Accessibility information is unavailable:", error);
+  }
+
   const recordsById = new Map(accessibilityRecords.map(record => [String(record.id), record]));
 
   return locations.map(location => ({
@@ -39,10 +46,13 @@ async function loadLocations(service) {
     console.error("Unable to load locations:", error);
     locationsList.innerHTML = `
       <div class="empty-state">
-        <h3>Unable to load locations</h3>
-        <p>Please try again later.</p>
+        <h3>Locations unavailable</h3>
+        <p>Check your connection and try again. You can still return to services or search by town when the demo data is available.</p>
+        <button class="primary-btn" type="button" id="retry-locations-btn">Try Again</button>
       </div>
     `;
+
+    document.getElementById("retry-locations-btn")?.addEventListener("click", () => loadLocations(service));
   }
 }
 
@@ -63,17 +73,15 @@ async function loadAllLocations() {
     console.warn("Unable to load all locations:", error);
     locationsList.innerHTML = `
       <div class="empty-state">
-        <h3>Find a service first</h3>
-        <p>Select a government service to see its available locations.</p>
-        <button class="primary-btn" type="button" id="find-services-btn">Find Services</button>
+        <h3>Locations unavailable</h3>
+        <p>Check your connection and try again. You can still browse services when the demo data is available.</p>
+        <button class="primary-btn" type="button" id="retry-all-locations-btn">Try Again</button>
       </div>
     `;
 
-    const button = document.getElementById("find-services-btn");
+    const button = document.getElementById("retry-all-locations-btn");
     if (button) {
-      button.addEventListener("click", () => {
-        showScreen("services-screen");
-      });
+      button.addEventListener("click", loadAllLocations);
     }
   }
 }
@@ -278,6 +286,7 @@ function renderLocationDetails(location, accessibility) {
         ${createIcon("navigation")}
         Start
       </button>
+      <p id="directions-status" class="directions-status" hidden></p>
     </div>
   `;
 
@@ -331,14 +340,25 @@ function initialiseLeafletMap(location) {
 }
 
 function openDirections() {
+  const status = document.getElementById("directions-status");
+
   if (!APP_STATE.currentLocation || !APP_STATE.currentLocation.address) {
+    if (status) {
+      status.textContent = "Directions are unavailable because this location has no address.";
+      status.hidden = false;
+    }
     return;
   }
 
   const destination = encodeURIComponent(APP_STATE.currentLocation.address);
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 
-  window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  const mapsWindow = window.open(mapsUrl, "_blank", "noopener,noreferrer");
+
+  if (!mapsWindow && status) {
+    status.textContent = `Directions could not be opened. Address: ${APP_STATE.currentLocation.address}`;
+    status.hidden = false;
+  }
 }
 
 function setLocationFilterByName(filterName) {

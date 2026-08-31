@@ -310,14 +310,15 @@ async function sendChatMessage(message, options = {}) {
     typing?.remove();
 
 
-    const errorMessage =
-      "Sorry, I'm having trouble connecting right now.";
+    const errorMessage = navigator.onLine === false
+      ? "You appear to be offline. Chat needs a connection, but you can still browse the service and location screens when the local demo server is available."
+      : "I can't reach Thušo right now. Please check your connection and try again.";
 
-
-    addChatMessage(
+    const errorBubble = addChatMessage(
       errorMessage,
       "assistant"
     );
+    errorBubble?.classList.add("unavailable-message");
 
 
     // If hands-free is active,

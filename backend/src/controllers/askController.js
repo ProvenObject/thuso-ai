@@ -1,5 +1,5 @@
 const { servicesData } = require("../data");
-const { getAiIntent } = require("../services/aiIntentService");
+const { getAiIntent, isAiServiceAvailable } = require("../services/aiIntentService");
 const {
   detectService,
   detectAccessibilityNeed,
@@ -113,6 +113,7 @@ async function ask(req, res) {
     selectedLocation: state.selectedLocation,
     pendingQuestion: state.pendingQuestion,
   });
+  const usingDeterministicFallback = !isAiServiceAvailable();
   console.log("AI Intent:", aiIntent);
 
   const detectedService = detectService(message, aiIntent);
@@ -230,6 +231,10 @@ async function ask(req, res) {
       userGoal: state.userGoal,
       focusLocation: confidentLocation,
     });
+  }
+
+  if (usingDeterministicFallback) {
+    response = `I'm having trouble reaching the AI service right now, but I can still help you find government services and locations. ${response}`;
   }
 
   state.pendingQuestion = clarification.needsClarification

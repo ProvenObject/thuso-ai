@@ -1165,6 +1165,22 @@ body.high-contrast-mode .location-card .location-distance {
     border-bottom-left-radius: 5px;
 }
 
+.unavailable-message,
+.directions-status {
+    border-color: var(--orange) !important;
+    background: var(--orange-light);
+    color: var(--text);
+}
+
+.directions-status {
+    margin: 12px 0 0;
+    padding: 12px;
+    border: 1px solid var(--orange);
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 .user-message {
     align-self: flex-end;
 
