@@ -799,7 +799,7 @@ function initialiseHandsFreeControls() {
   }
 
   APP_STATE.handsFreeRecognition = new SpeechRecognition();
-  APP_STATE.handsFreeRecognition.lang = "en-ZA";
+  configureSpeechRecognitionLanguage(APP_STATE.handsFreeRecognition);
   APP_STATE.handsFreeRecognition.continuous = false;
   APP_STATE.handsFreeRecognition.interimResults = false;
 
@@ -847,6 +847,12 @@ function initialiseHandsFreeControls() {
 
   APP_STATE.handsFreeRecognition.addEventListener("error", event => {
     APP_STATE.isHandsFreeListening = false;
+
+    if (event.error === "language-not-supported") {
+      stopHandsFreeMode();
+      updateHandsFreeStatus("The selected speech recognition language is not supported by this browser. Please choose another language or use typed chat.");
+      return;
+    }
 
     if (event.error !== "no-speech" && event.error !== "aborted") {
       console.warn("Hands free recognition error:", event.error);

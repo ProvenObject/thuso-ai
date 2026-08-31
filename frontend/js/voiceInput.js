@@ -1,3 +1,39 @@
+const SPEECH_LANGUAGE_TAGS = {
+  en: "en-ZA",
+  af: "af-ZA",
+  zu: "zu-ZA",
+  xh: "xh-ZA",
+  nso: "nso-ZA",
+  tn: "tn-ZA"
+};
+
+function getSelectedSpeechLanguage() {
+  return SPEECH_LANGUAGE_TAGS[APP_STATE.appLanguage] || SPEECH_LANGUAGE_TAGS.en;
+}
+
+function configureSpeechRecognitionLanguage(recognition) {
+  if (!recognition) {
+    return;
+  }
+
+  recognition.lang = getSelectedSpeechLanguage();
+}
+
+function normaliseSpeechText(text) {
+  const plainText = String(text || "")
+    .replace(/[`*_#>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (plainText.length <= 420) {
+    return plainText;
+  }
+
+  const shortened = plainText.slice(0, 420);
+  const lastSentence = Math.max(shortened.lastIndexOf("."), shortened.lastIndexOf("?"), shortened.lastIndexOf("!"));
+  return `${shortened.slice(0, lastSentence > 80 ? lastSentence + 1 : shortened.length).trim()}...`;
+}
+
 // Speech recognition for chat input
 function initialiseSpeechRecognition() {
   const voiceButton = document.getElementById("voice-btn");
@@ -13,7 +49,7 @@ function initialiseSpeechRecognition() {
   APP_STATE.recognition = new SpeechRecognition();
   APP_STATE.recognition.continuous = false;
   APP_STATE.recognition.interimResults = false;
-  APP_STATE.recognition.lang = "en-ZA";
+  configureSpeechRecognitionLanguage(APP_STATE.recognition);
 
   APP_STATE.recognition.addEventListener("start", () => {
     APP_STATE.isListening = true;
@@ -60,6 +96,11 @@ function initialiseSpeechRecognition() {
     voiceButton.disabled = false;
     voiceButton.classList.remove("recording");
 
+    if (event.error === "language-not-supported") {
+      updateHandsFreeStatus("The selected speech recognition language is not supported by this browser. Please choose another language or type your message.");
+      return;
+    }
+
     if (event.error !== "no-speech" && event.error !== "aborted") {
       console.error("Speech recognition error:", event.error);
     }
@@ -104,13 +145,15 @@ function resolvePreferredVoice() {
     return null;
   }
 
-  const southAfricanEnglish = voices.find(voice => voice.lang && voice.lang.toLowerCase() === "en-za");
+  const requestedLanguage = getSelectedSpeechLanguage().toLowerCase();
+  const requestedVoice = voices.find(voice => voice.lang && voice.lang.toLowerCase() === requestedLanguage);
 
-  if (southAfricanEnglish) {
-    return southAfricanEnglish;
+  if (requestedVoice) {
+    return requestedVoice;
   }
 
-  return voices.find(voice => voice.lang && voice.lang.toLowerCase().startsWith("en")) || null;
+  const southAfricanEnglish = voices.find(voice => voice.lang && voice.lang.toLowerCase() === "en-za");
+  return southAfricanEnglish || voices.find(voice => voice.lang && voice.lang.toLowerCase().startsWith("en")) || null;
 }
 
 let hasRequestedVoiceList = false;
@@ -132,6 +175,12 @@ function initialiseSpeechSynthesisVoice() {
       window.speechSynthesis.removeEventListener("voiceschanged", handleVoicesChanged);
     });
   }
+}
+
+function refreshSpeechSynthesisVoice() {
+  APP_STATE.preferredVoice = null;
+  hasRequestedVoiceList = false;
+  initialiseSpeechSynthesisVoice();
 }
 
 function speakText(text) {
@@ -162,9 +211,18 @@ function speakText(text) {
 
   window.speechSynthesis.cancel();
 
-  APP_STATE.lastSpokenText = text;
+  const speechText = normaliseSpeechText(text);
 
-  const speech = new SpeechSynthesisUtterance(text);
+  if (!speechText) {
+    if (APP_STATE.handsFreeModeActive) {
+      resumeHandsFreeListening();
+    }
+    return;
+  }
+
+  APP_STATE.lastSpokenText = speechText;
+
+  const speech = new SpeechSynthesisUtterance(speechText);
 
   // Use the actual matched voice when we have one; otherwise keep the en-ZA hint so
   // the browser can still pick its closest available English voice.

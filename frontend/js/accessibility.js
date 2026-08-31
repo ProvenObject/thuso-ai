@@ -152,14 +152,13 @@ function applyLanguagePreference(languageCode = APP_STATE.appLanguage) {
 
   document.documentElement.lang = language;
 
-  if (APP_STATE.handsFreeRecognition) {
-    APP_STATE.handsFreeRecognition.lang =
-      language === "af" ? "af-ZA" :
-      language === "zu" ? "zu-ZA" :
-      language === "xh" ? "xh-ZA" :
-      language === "nso" ? "n-ZA" :
-      language === "tn" ? "en-ZA" :
-      "en-ZA";
+  if (typeof configureSpeechRecognitionLanguage === "function") {
+    configureSpeechRecognitionLanguage(APP_STATE.recognition);
+    configureSpeechRecognitionLanguage(APP_STATE.handsFreeRecognition);
+  }
+
+  if (typeof refreshSpeechSynthesisVoice === "function") {
+    refreshSpeechSynthesisVoice();
   }
 
   const status = `Language set to ${language.toUpperCase()}.`;

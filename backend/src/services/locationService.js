@@ -2,67 +2,43 @@ const { servicesData, locationsData, accessibilityData } = require("../data");
 
 const serviceByName = (name) => servicesData.services.find((service) => service.name === name) || null;
 
+const SERVICE_ALIASES = {
+  "Home Affairs": ["home affairs", "id", "identity", "identity document", "identification", "id card", "passport", "birth certificate", "marriage certificate"],
+  SASSA: ["sassa", "grant", "social grant", "sassa grant"],
+  "Department of Health": ["health", "healthcare", "clinic", "hospital", "doctor", "medical", "medicine", "sick", "ill"],
+  "Municipal Services": ["municipality", "municipal", "rates", "water", "electricity", "refuse"],
+  Education: ["education", "school", "bursary", "university", "college"],
+};
+
+const CITY_ALIASES = {
+  Polokwane: ["polokwane", "polokwane"],
+  Seshego: ["seshego", "sesego"],
+  Lebowakgomo: ["lebowakgomo", "lebowakgmo", "lebowakomo", "leboakgomo", "lebowa kgomo"],
+  Mokopane: ["mokopane", "mokopani"],
+  Tzaneen: ["tzaneen", "tsaneen"],
+  Giyani: ["giyani", "gianyi"],
+  Thohoyandou: ["thohoyandou", "thoyandou", "thohoyando", "tohoyandou"],
+  "Louis Trichardt": ["louis trichardt", "louis trichard", "louis richardt", "makhado"],
+  Musina: ["musina", "messina"],
+  Burgersfort: ["burgersfort", "burgers fort"],
+  "Jane Furse": ["jane furse", "janefurse", "jane first"],
+};
+
+const includesAlias = (message, aliases) => aliases.some((alias) =>
+  new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(message)
+);
+
 const detectService = (message, aiIntent) => {
   if (aiIntent?.service) {
     return serviceByName(aiIntent.service);
   }
 
-  const namedService = servicesData.services.find((service) => message.includes(service.name.toLowerCase()));
+  const namedService = servicesData.services.find((service) =>
+    includesAlias(message, SERVICE_ALIASES[service.name] || [service.name.toLowerCase()])
+  );
 
   if (namedService) {
     return namedService;
-  }
-
-  if (
-    message.includes("id") ||
-    message.includes("identity") ||
-    message.includes("passport") ||
-    message.includes("birth certificate") ||
-    message.includes("marriage certificate")
-  ) {
-    return serviceByName("Home Affairs");
-  }
-
-  if (
-    message.includes("grant") ||
-    message.includes("sassa") ||
-    message.includes("social grant")
-  ) {
-    return serviceByName("SASSA");
-  }
-
-  if (
-    message.includes("clinic") ||
-    message.includes("hospital") ||
-    message.includes("health") ||
-    message.includes("doctor") ||
-    message.includes("medicine") ||
-    message.includes("sick") ||
-    message.includes("ill") ||
-    message.includes("medical")
-  ) {
-    return serviceByName("Department of Health");
-  }
-
-  if (
-    message.includes("municipality") ||
-    message.includes("municipal") ||
-    message.includes("rates") ||
-    message.includes("water") ||
-    message.includes("electricity") ||
-    message.includes("refuse")
-  ) {
-    return serviceByName("Municipal Services");
-  }
-
-  if (
-    message.includes("education") ||
-    message.includes("school") ||
-    message.includes("bursary") ||
-    message.includes("university") ||
-    message.includes("college")
-  ) {
-    return serviceByName("Education");
   }
 
   return null;
@@ -116,30 +92,8 @@ const detectCity = (message, aiIntent) => {
     return aiIntent.city;
   }
 
-  // Explicit, known speech-to-text variants of these town names (missing letters,
-  // dropped syllables, or a stray space). Not fuzzy/similarity matching - only the
-  // specific variants we expect from imperfect transcription are listed here.
-  const cityAliases = {
-    lebowakgmo: "Lebowakgomo",
-    lebowakgomo: "Lebowakgomo",
-    lebowakomo: "Lebowakgomo",
-    "lebowa kgomo": "Lebowakgomo",
-    polokwane: "Polokwane",
-    seshego: "Seshego",
-    mokopane: "Mokopane",
-    tzaneen: "Tzaneen",
-    giyani: "Giyani",
-    thohoyandou: "Thohoyandou",
-    thoyandou: "Thohoyandou",
-    "louis trichardt": "Louis Trichardt",
-    "louis trichard": "Louis Trichardt",
-    musina: "Musina",
-    burgersfort: "Burgersfort",
-    "jane furse": "Jane Furse",
-  };
-
-  for (const [alias, cityName] of Object.entries(cityAliases)) {
-    if (message.includes(alias)) {
+  for (const [cityName, aliases] of Object.entries(CITY_ALIASES)) {
+    if (includesAlias(message, aliases)) {
       return cityName;
     }
   }

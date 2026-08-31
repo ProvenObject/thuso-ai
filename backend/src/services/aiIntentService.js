@@ -74,10 +74,17 @@ Known cities:
 - Burgersfort
 - Jane Furse
 
-The message may come from speech-to-text and contain small transcription errors
-(missing or extra letters, a misplaced space). If the message clearly refers to one
-of the known cities above, return that city's exact spelling - do not invent a city
-that is not in this list.
+The message may come from speech-to-text and contain a known local transcription
+variant. Canonicalise only these explicit variants: Lebowakomo, Leboakgomo, and
+Lebowa Kgomo mean Lebowakgomo; Thoyandou and Thohoyando mean Thohoyandou; Mokopani
+means Mokopane; Sesego means Seshego; Jane First means Jane Furse; Louis Richardt
+means Louis Trichardt. Return the exact known-city spelling. Do not use fuzzy
+matching or invent a city not in the known list.
+
+Map common service terms carefully: ID, identification, identity document, passport,
+birth certificate and marriage certificate refer to Home Affairs; grant, social grant
+and SASSA grant refer to SASSA; doctor, hospital, clinic and healthcare refer to
+Department of Health; school, education and bursary refer to Education.
 
 Allowed intent values:
 - find_service
