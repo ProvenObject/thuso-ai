@@ -336,9 +336,12 @@ async function sendChatMessage(message) {
     APP_STATE.isWaitingForResponse =
       false;
 
-    // Safety net: if no TTS ends up playing for this turn, this still brings the
-    // mic back once the request is no longer in flight.
-    if (typeof resumeHandsFreeListening === "function") {
+    // TTS resumes hands-free listening after speech ends. When voice output is
+    // disabled, resume here because there is no speech lifecycle to do it.
+    if (
+      typeof resumeHandsFreeListening === "function" &&
+      (!APP_STATE.handsFreeModeActive || !APP_STATE.voiceOutputEnabled)
+    ) {
       resumeHandsFreeListening();
     }
 

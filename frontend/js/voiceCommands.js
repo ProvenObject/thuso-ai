@@ -579,7 +579,7 @@ function executeHandsFreeCommand(rawCommand) {
 
   if (typeof sendChatMessage === "function") {
     updateHandsFreeStatus(HANDS_FREE_STATUS.THINKING);
-    sendChatMessage(command);
+    sendChatMessage(rawCommand);
     return true;
   }
 

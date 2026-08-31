@@ -136,11 +136,17 @@ function initialiseSpeechSynthesisVoice() {
 
 function speakText(text) {
   if (!APP_STATE.voiceOutputEnabled) {
+    if (APP_STATE.handsFreeModeActive) {
+      resumeHandsFreeListening();
+    }
     return;
   }
 
   if (!("speechSynthesis" in window)) {
     console.warn("Text-to-speech is not supported.");
+    if (APP_STATE.handsFreeModeActive) {
+      resumeHandsFreeListening();
+    }
     return;
   }
 
