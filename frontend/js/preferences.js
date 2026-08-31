@@ -67,6 +67,12 @@ function initialisePreferences() {
 
   const contrastToggle = document.getElementById("high-contrast-toggle");
   const readAloudToggle = document.getElementById("read-aloud-toggle");
+  const voiceToggle = document.querySelector('.toggle:not(#high-contrast-toggle):not(#read-aloud-toggle)');
+
+  if (voiceToggle) {
+    voiceToggle.classList.toggle("active", APP_STATE.voiceOutputEnabled);
+    voiceToggle.setAttribute("aria-pressed", String(APP_STATE.voiceOutputEnabled));
+  }
 
   if (readAloudToggle) {
     readAloudToggle.addEventListener("click", () => {

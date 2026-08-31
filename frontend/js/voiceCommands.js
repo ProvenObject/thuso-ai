@@ -207,10 +207,8 @@ const HANDS_FREE_COMMANDS = [
       "voice responses on", "voice output on", "enable voice output"
     ],
     run: () => {
-      APP_STATE.voiceOutputEnabled = true;
-      const status = "Voice responses enabled.";
-      updateHandsFreeStatus(status);
-      speakText(status);
+      setVoiceOutputMode(true);
+      speakText("Voice responses enabled.");
       return true;
     }
   },
@@ -223,9 +221,7 @@ const HANDS_FREE_COMMANDS = [
       "mute voice", "silence voice"
     ],
     run: () => {
-      APP_STATE.voiceOutputEnabled = false;
-      const status = "Voice responses disabled.";
-      updateHandsFreeStatus(status);
+      setVoiceOutputMode(false);
       return true;
     }
   },
@@ -400,14 +396,7 @@ const HANDS_FREE_COMMANDS = [
       "reset text size", "reset font size", "default text size", "restore text size"
     ],
     run: () => {
-      const textSizeInput = document.getElementById("text-size");
-      document.documentElement.style.fontSize = "16px";
-      if (textSizeInput) {
-        textSizeInput.value = "16";
-      }
-      const status = "Text size reset to default.";
-      updateHandsFreeStatus(status);
-      speakText(status);
+      setTextSize(16);
       return true;
     }
   },

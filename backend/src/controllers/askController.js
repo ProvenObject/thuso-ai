@@ -114,7 +114,6 @@ async function ask(req, res) {
     pendingQuestion: state.pendingQuestion,
   });
   const usingDeterministicFallback = !isAiServiceAvailable();
-  console.log("AI Intent:", aiIntent);
 
   const detectedService = detectService(message, aiIntent);
   const serviceChanged = Boolean(detectedService) && state.service !== detectedService.name;
@@ -290,8 +289,6 @@ async function ask(req, res) {
       ? cityFilteredLocations
       : (accessibilityFilteredLocations.length > 0 ? accessibilityFilteredLocations : locations);
   }
-
-  console.log("Conversation state:", { conversationId, state });
 
   return res.json(
     buildAskResponse({

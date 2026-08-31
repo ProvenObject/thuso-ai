@@ -527,6 +527,10 @@ function addChatServiceAction(service) {
 
   if (!chatMessages) return;
 
+  if ([...chatMessages.querySelectorAll(".chat-service-btn")].some(button => String(button.dataset.serviceId) === String(service.id))) {
+    return;
+  }
+
 
   const button =
     document.createElement("button");
@@ -536,6 +540,8 @@ function addChatServiceAction(service) {
 
   button.className =
     "chat-service-btn";
+
+  button.dataset.serviceId = service.id;
 
   button.textContent =
     `View ${service.name} locations →`;
