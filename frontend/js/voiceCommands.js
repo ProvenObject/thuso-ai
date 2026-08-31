@@ -141,6 +141,21 @@ function commandIncludesPhrase(command, phrase) {
   return new RegExp(`\\b${escapedPhrase}\\b`, "i").test(command);
 }
 
+function setMobilityPreferenceFromVoice(enabled) {
+  const mobilityChip = [...document.querySelectorAll(".preference-chip")]
+    .find(chip => chip.textContent.toLowerCase().includes("mobility"));
+
+  if (!mobilityChip) {
+    return false;
+  }
+
+  if (mobilityChip.classList.contains("selected") !== enabled) {
+    mobilityChip.click();
+  }
+
+  return true;
+}
+
 // Explicit UI-control phrases only. Conversational words like "ID", "Home Affairs",
 // "wheelchair", "doctor" or "hospital" must never appear here - those belong in chat.
 const HANDS_FREE_COMMANDS = [
@@ -149,7 +164,8 @@ const HANDS_FREE_COMMANDS = [
     phrases: [
       "increase text size", "make text bigger", "bigger text", "larger text",
       "make text larger", "text bigger", "text size up", "increase font size",
-      "make font bigger", "zoom in text", "bigger font"
+      "make font bigger", "zoom in text", "bigger font", "make the writing bigger",
+      "increase the text", "make everything larger"
     ],
     run: () => { changeTextSize(1); return true; }
   },
@@ -158,7 +174,7 @@ const HANDS_FREE_COMMANDS = [
     phrases: [
       "decrease text size", "make text smaller", "smaller text", "reduce text size",
       "text smaller", "text size down", "decrease font size", "make font smaller",
-      "zoom out text", "smaller font"
+      "zoom out text", "smaller font", "make the writing smaller", "make everything smaller"
     ],
     run: () => { changeTextSize(-1); return true; }
   },
@@ -178,7 +194,8 @@ const HANDS_FREE_COMMANDS = [
       "turn off high contrast", "turn high contrast off", "disable high contrast",
       "deactivate high contrast", "high contrast off", "turn off contrast",
       "turn contrast off", "disable contrast", "deactivate contrast", "contrast off",
-      "normal contrast", "low contrast", "switch off high contrast", "high contrast mode off"
+      "normal contrast", "low contrast", "switch off high contrast", "high contrast mode off",
+      "remove high contrast"
     ],
     run: () => { setHighContrastMode(false); return true; }
   },
@@ -216,7 +233,7 @@ const HANDS_FREE_COMMANDS = [
     id: "go_back",
     phrases: [
       "go back", "previous screen", "back button", "go to previous screen", "take me back",
-      "go to the previous page", "previous page"
+      "go to the previous page", "previous page", "return"
     ],
     run: () => {
       showScreen(APP_STATE.previousScreen || "home-screen");
@@ -288,8 +305,7 @@ const HANDS_FREE_COMMANDS = [
   {
     id: "open_menu",
     phrases: [
-      "open menu", "show menu", "open settings", "show settings", "go to menu",
-      "main menu", "open the settings", "show the menu", "go to settings"
+      "open menu", "show menu", "go to menu", "main menu", "show the menu"
     ],
     run: () => {
       showScreen("menu-screen");
@@ -303,7 +319,8 @@ const HANDS_FREE_COMMANDS = [
     id: "open_preferences",
     phrases: [
       "open preferences", "show preferences", "my preferences", "go to preferences",
-      "accessibility settings", "open the preferences screen", "show my preferences"
+      "accessibility settings", "open the preferences screen", "show my preferences",
+      "open settings", "show settings", "open the settings", "go to settings"
     ],
     run: () => {
       showScreen("preferences-screen");
@@ -322,6 +339,56 @@ const HANDS_FREE_COMMANDS = [
     run: () => {
       showScreen("saved-screen");
       const status = "Opening saved places.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "open_camera",
+    phrases: [
+      "open camera", "start camera", "use camera", "read something", "scan text"
+    ],
+    run: () => {
+      showScreen("camera-screen");
+      const status = "Opening camera.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "mobility_preference_on",
+    phrases: [
+      "turn on mobility preference", "enable mobility preference", "mobility preference on",
+      "turn on mobility mode", "enable mobility mode"
+    ],
+    run: () => {
+      if (setMobilityPreferenceFromVoice(true)) {
+        return true;
+      }
+
+      const status = "Mobility preferences are unavailable right now.";
+      updateHandsFreeStatus(status);
+      speakText(status);
+      return true;
+    }
+  },
+  {
+    id: "mobility_preference_off",
+    phrases: [
+      "turn off mobility preference", "disable mobility preference", "mobility preference off",
+      "turn off mobility mode", "disable mobility mode"
+    ],
+    run: () => {
+      if (setMobilityPreferenceFromVoice(false)) {
+        const status = "Mobility preference disabled.";
+        updateHandsFreeStatus(status);
+        speakText(status);
+        return true;
+      }
+
+      const status = "Mobility preferences are unavailable right now.";
       updateHandsFreeStatus(status);
       speakText(status);
       return true;
@@ -554,6 +621,67 @@ function classifyHandsFreeCommand(command) {
   return { type: "conversational" };
 }
 
+function isHandsFreeConfirmation(command) {
+  return /^(yes|yes please|please do|go ahead|okay|ok|sure|do it)$/i.test(command);
+}
+
+function isHandsFreeRejection(command) {
+  return /^(no|no thanks|not now|cancel that|never mind)$/i.test(command);
+}
+
+function describePendingHandsFreeAction(action) {
+  if (action?.type === "filter_locations") {
+    return "matching accessible locations";
+  }
+
+  return "matching locations";
+}
+
+async function sendHandsFreeConversation(rawCommand) {
+  const command = normaliseVoiceCommand(rawCommand);
+  const pendingAction = APP_STATE.handsFreePendingAction;
+
+  if (pendingAction && isHandsFreeConfirmation(command)) {
+    APP_STATE.handsFreePendingAction = null;
+    handleBackendAction(pendingAction, { allowLocationNavigation: true });
+    speakText(`Showing ${describePendingHandsFreeAction(pendingAction)}.`);
+    return;
+  }
+
+  if (pendingAction && isHandsFreeRejection(command)) {
+    APP_STATE.handsFreePendingAction = null;
+    speakText("Okay, I'll keep us in the conversation.");
+    return;
+  }
+
+  // A new request replaces an unanswered offer, so old results cannot control it.
+  APP_STATE.handsFreePendingAction = null;
+
+  const data = await sendChatMessage(rawCommand, {
+    handleBackendAction: false,
+    speakResponse: false
+  });
+
+  if (!data) {
+    return;
+  }
+
+  const responseText = data.response || data.message || "Sorry, I could not find an answer.";
+  const action = data.action;
+
+  if (action?.type === "show_locations" || action?.type === "filter_locations") {
+    APP_STATE.handsFreePendingAction = action;
+    speakText(`${responseText} I found ${describePendingHandsFreeAction(action)}. Would you like me to show them?`);
+    return;
+  }
+
+  if (action?.type === "show_location_details" || action?.type === "open_directions") {
+    handleBackendAction(action, { allowLocationNavigation: true });
+  }
+
+  speakText(responseText);
+}
+
 function executeHandsFreeCommand(rawCommand) {
   const command = normaliseVoiceCommand(rawCommand);
   const classification = classifyHandsFreeCommand(command);
@@ -579,7 +707,7 @@ function executeHandsFreeCommand(rawCommand) {
 
   if (typeof sendChatMessage === "function") {
     updateHandsFreeStatus(HANDS_FREE_STATUS.THINKING);
-    sendChatMessage(rawCommand);
+    sendHandsFreeConversation(rawCommand);
     return true;
   }
 

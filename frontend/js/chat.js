@@ -121,7 +121,7 @@ function removeTypingIndicator() {
 // SEND MESSAGE
 // ------------------------------------------------------------
 
-async function sendChatMessage(message) {
+async function sendChatMessage(message, options = {}) {
   const cleanMessage =
     String(message || "").trim();
 
@@ -271,24 +271,29 @@ async function sendChatMessage(message) {
     // Backend-driven UI action
     // --------------------------------------------------------
 
-    handleBackendAction(
-      data.action,
-      {
-        allowLocationNavigation:
-          isExplicitLocationNavigationRequest(
-            cleanMessage
-          )
-      }
-    );
+    if (options.handleBackendAction !== false) {
+      handleBackendAction(
+        data.action,
+        {
+          allowLocationNavigation:
+            options.allowLocationNavigation === true ||
+            isExplicitLocationNavigationRequest(
+              cleanMessage
+            )
+        }
+      );
+    }
 
 
     // --------------------------------------------------------
     // Speak response
     // --------------------------------------------------------
 
-    speakText(
-      responseText
-    );
+    if (options.speakResponse !== false) {
+      speakText(
+        responseText
+      );
+    }
 
 
     return data;
