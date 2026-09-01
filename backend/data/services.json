@@ -1,0 +1,39 @@
+{
+  "services": [
+    {
+      "id": 1,
+      "name": "Home Affairs",
+      "category": "Government Services",
+      "description": "Identity documents, passports and civil registration services.",
+      "locations": []
+    },
+    {
+      "id": 2,
+      "name": "SASSA",
+      "category": "Social Services",
+      "description": "Social grants and beneficiary support.",
+      "locations": []
+    },
+    {
+      "id": 3,
+      "name": "Department of Health",
+      "category": "Health",
+      "description": "Public healthcare and health-related services.",
+      "locations": []
+    },
+    {
+      "id": 4,
+      "name": "Municipal Services",
+      "category": "Municipal",
+      "description": "Rates, certificates and local government services.",
+      "locations": []
+    },
+    {
+      "id": 5,
+      "name": "Education",
+      "category": "Education",
+      "description": "Education and bursary-related services.",
+      "locations": []
+    }
+  ]
+}

@@ -1,12 +1,6 @@
-const express = require("express");
-
-const app = express();
-const PORT = 3000;
-
-app.get("/", (req, res) => {
-    res.send("Thušo AI server is running!");
-});
+const app = require("./src/app");
+const { PORT } = require("./config");
 
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Thušo AI running at http://localhost:${PORT}`);
 });
