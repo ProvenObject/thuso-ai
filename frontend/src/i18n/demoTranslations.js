@@ -1,0 +1,106 @@
+// Best-effort demo translations for the scripted 3-turn conversation and
+// the empty-state nurse greeting shown on <CameraScreen />. These cover
+// only the fixed strings the demo script uses — not a general translation
+// system — and have not been reviewed by native speakers, so treat them
+// as demo-quality placeholders rather than clinically accurate text.
+
+export const NURSE_GREETING = {
+  af: 'Hallo, hoe kan ons jou vandag help?',
+  en: 'Hi how can we assist you today?',
+  nr: 'Sawubona, singakusiza njani namhlanje?',
+  xh: 'Molo, singakunceda njani namhlanje?',
+  zu: 'Sawubona, singakusiza kanjani namuhla?',
+  nso: 'Dumela, re ka go thuša bjang lehono?',
+  st: 'Dumela, re ka o thusa joang kajeno?',
+  tn: 'Dumela, re ka go thusa jang gompieno?',
+  ss: 'Sawubona, singakusita njani lamuhla?',
+  ve: 'Ndaa, ri nga U thusa hani namusi?',
+  ts: 'Avuxeni, hi nga ku pfuna njhani namuntlha?',
+}
+
+export const DEMO_TURN_TRANSLATIONS = [
+  {
+    prompt: {
+      af: 'Hoe kan ek jou help?',
+      en: 'How can I help you?',
+      nr: 'Ngingakusiza njani?',
+      xh: 'Ndingakunceda njani?',
+      zu: 'Ngingakusiza kanjani?',
+      nso: 'Nka go thuša bjang?',
+      st: 'Nka o thusa joang?',
+      tn: 'Nka go thusa jang?',
+      ss: 'Ngingakusita njani?',
+      ve: 'Ndi nga U thusa hani?',
+      ts: 'Ndzi nga ku pfuna njhani?',
+    },
+    reply: {
+      af: 'Haai ek is in pyn',
+      en: 'Hi I am in pain',
+      nr: 'Sawubona ngineenhlungu',
+      xh: 'Molo ndineentlungu',
+      zu: 'Sawubona nginobuhlungu',
+      nso: 'Dumela ke na le bohloko',
+      st: 'Dumela ke na le bohloko',
+      tn: 'Dumela ke na le botlhoko',
+      ss: 'Sawubona nginebuhlungu',
+      ve: 'Ndaa ndi na vhuvhavhi',
+      ts: 'Avuxeni ndzi na vuvabyi',
+    },
+  },
+  {
+    prompt: {
+      af: 'Waar is die pyn?',
+      en: 'Where does it hurt?',
+      nr: 'Kubuhlungu kuphi?',
+      xh: 'Kubuhlungu phi?',
+      zu: 'Kubuhlungu kuphi?',
+      nso: 'Go bohloko kae?',
+      st: 'Ho bohloko kae?',
+      tn: 'Go botlhoko kae?',
+      ss: 'Kubuhlungu kuphi?',
+      ve: 'Zwi vhavha ngafhi?',
+      ts: 'Swi vava kwihi?',
+    },
+    reply: {
+      af: 'Maag',
+      en: 'Stomach',
+      nr: 'Isisu',
+      xh: 'Isisu',
+      zu: 'Isisu',
+      nso: 'Mpa',
+      st: 'Mpa',
+      tn: 'Mpa',
+      ss: 'Sisu',
+      ve: 'Mala',
+      ts: 'Khwiri',
+    },
+  },
+  {
+    prompt: {
+      af: 'Kan ek asseblief jou ID-kaart kry',
+      en: 'Can I have your ID card',
+      nr: 'Ngingaba nekhadi lakho lomazisi?',
+      xh: 'Ndingayifumana ikhadi lakho lesazisi?',
+      zu: 'Ngingalithola ikhadi lakho lesazisi?',
+      nso: 'Nka hwetša karata ya gago ya boitsebišo?',
+      st: 'Na nka fumana karete ya hao ya boitsebiso?',
+      tn: 'A nka bona karata ya gago ya boitshupo?',
+      ss: 'Ngingayitfola likhadi lakho lebunikazi?',
+      ve: 'Ndi nga wana khadi yau ya vhusuma?',
+      ts: 'Ndzi nga kuma khadi ra wena ra vutivi?',
+    },
+    reply: {
+      af: 'Oukei',
+      en: 'Okey',
+      nr: 'Kulungile',
+      xh: 'Kulungile',
+      zu: 'Kulungile',
+      nso: 'Go lokile',
+      st: 'Ho lokile',
+      tn: 'Go siame',
+      ss: 'Kulungile',
+      ve: 'Zwo lugha',
+      ts: 'Swi lulamile',
+    },
+  },
+]
